@@ -361,9 +361,10 @@ def main_worker(gpu, ngpus_per_node, args):
                             print('New best for {}. Saving model: {}'.format(eval_metrics[i], model_save_name))
                             if i == 0:
                                 checkpoint = {'model': model.state_dict(), "optimizer": optimizer.state_dict()}
+                                torch.save(checkpoint, args.log_directory + '/' + args.model_name + model_save_name)
                             else:
-                                checkpoint = {'model': model.state_dict()}
-                            torch.save(checkpoint, args.log_directory + '/' + args.model_name + model_save_name)
+                                print()
+                            
                     eval_summary_writer.flush()
                 model.train()
                 block_print()
