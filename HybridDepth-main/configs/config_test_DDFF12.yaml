@@ -1,0 +1,15 @@
+# pytorch_lightning==2.1.0
+data:
+  # For DDFF12DataModule
+  class_path: dataloader.dataset.DDFF12DataModule # Path to your dataloader Module in dataset.py
+  init_args:
+    ddff12_data_root: '/home/ashkanganj/workspace/dataset/dff_trainVal.h5'  # path to the specific dataset
+    img_size: [383, 552]  # Adjust if your DDFF12DataModule expects a tuple for img_size
+    remove_white_border: True
+    batch_size: 1
+    num_workers: 5
+    use_labels: True
+model:
+  invert_depth: False
+
+ckpt_path: checkpoints/DDFF12.ckpt #path to the checkpoint
