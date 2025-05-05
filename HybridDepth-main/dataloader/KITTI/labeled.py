@@ -59,8 +59,8 @@ class KITTIEIGENLabeledDataset(Dataset):
         else:
             crop_params = get_black_border(np.array(color_img, dtype=np.uint8))
         
-        color_img = color_img.crop((crop_params.left, crop_params.top, crop_params.right, crop_params.bottom))
-        depth_gt = depth_gt.crop((crop_params.left, crop_params.top, crop_params.right, crop_params.bottom))
+        # color_img = color_img.crop((crop_params.left, crop_params.top, crop_params.right, crop_params.bottom))
+        # depth_gt = depth_gt.crop((crop_params.left, crop_params.top, crop_params.right, crop_params.bottom))
 
         
         h, w = self.img_size
