@@ -1,2 +1,2 @@
 # depth_estimation_thesis
-I need to finish this to get my Master's Degree, then I'll earn six-figure salary.
+Code base for my Master's Thesis for the Data Science Master's program, Hanoi University of Science - Vietnam National University.

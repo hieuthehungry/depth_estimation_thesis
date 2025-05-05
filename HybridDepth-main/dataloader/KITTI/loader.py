@@ -20,8 +20,8 @@ class KITTIEIGENLoader(Dataset):
     ) -> None:
         super(KITTIEIGENLoader, self).__init__()
 
-        self.nyuv2_dataset = KITTIEIGENLabeledDataset(
-            nyuv2_data_root,
+        self.kitti_eigen_dataset = KITTIEIGENLabeledDataset(
+            kitti_eigen_data_root,
             img_size=img_size,
             remove_white_border=remove_white_border,
             stage=stage

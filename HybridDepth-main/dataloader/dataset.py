@@ -184,7 +184,7 @@ class NYUDataModule(pl.LightningDataModule):
 class KITTIEIGENDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        nyuv2_data_root: str = "",
+        kitti_eigen_data_root: str = "",
         img_size: Tuple = (480, 640),
         remove_white_border: bool = True,
         batch_size: int = 32,
@@ -197,7 +197,7 @@ class KITTIEIGENDataModule(pl.LightningDataModule):
         super().__init__()
         # Set the seed for PyTorch
         # torch.manual_seed(42)
-        self.nyu_data_root = nyuv2_data_root
+        self.kitti_eigen_data_root = kitti_eigen_data_root
         self.image_size = img_size
         self.remove_white_border = remove_white_border
         self.n_stack = n_stack
@@ -215,14 +215,14 @@ class KITTIEIGENDataModule(pl.LightningDataModule):
     def setup(self, stage: str):
         if stage == "fit":
             self.train_dataset = KITTIEIGENLoader(
-                self.nyu_data_root,
+                self.kitti_eigen_data_root,
                 img_size=self.image_size,
                 remove_white_border=self.remove_white_border,
                 n_stack=self.n_stack,
                 stage="train"
             )
             self.test_dataset = KITTIEIGENLoader(
-                self.nyu_data_root,
+                self.kitti_eigen_data_root,
                 img_size=self.image_size,
                 remove_white_border=self.remove_white_border,
                 n_stack=self.n_stack,
@@ -230,7 +230,7 @@ class KITTIEIGENDataModule(pl.LightningDataModule):
             )
         if stage == "test":
             self.test_dataset = KITTIEIGENLoader(
-                self.nyu_data_root,
+                self.kitti_eigen_data_root,
                 img_size=self.image_size,
                 remove_white_border=self.remove_white_border,
                 n_stack=self.n_stack,
