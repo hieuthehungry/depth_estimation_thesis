@@ -10,6 +10,7 @@ import imageio
 import os
 from . import preprocess
 from .preprocess import CropParams, get_white_border, get_black_border
+import pathlib
 
 class KITTIEIGENLabeledDataset(Dataset):
     """Python interface for the labeled subset of the KITTI EIGEN dataset.
@@ -40,13 +41,15 @@ class KITTIEIGENLabeledDataset(Dataset):
 
         if self.stage == 'test':
             file_path = self.samples_pth[idx].split()[0]
-            base_dir = os.path.split(file_path)[0]
+            p = pathlib.Path(file_path)
+            base_dir = p.parts[0]
             color_img = Image.open(os.path.join(self.root_dir, self.stage,self.samples_pth[idx].split()[0]))
             depth_gt = Image.open(os.path.join(self.root_dir, self.stage, base_dir, self.samples_pth[idx].split()[1]))
         else:
             color_img_path = self.root_dir
             file_path = self.samples_pth[idx].split()[0]
-            base_dir = os.path.split(file_path)[0]
+            p = pathlib.Path(file_path)
+            base_dir = p.parts[0]
             color_img = Image.open(f'{color_img_path}/{self.stage}/{self.samples_pth[idx].strip().split()[0]}')
             depth_gt = Image.open(f'{color_img_path}/{self.stage}/{base_dir}/{self.samples_pth[idx].strip().split()[1]}')
             
