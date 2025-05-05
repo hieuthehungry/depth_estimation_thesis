@@ -99,12 +99,12 @@ class KITTIEIGENLabeledDataset(Dataset):
 
         color_img = color_img.transpose(2, 0, 1)
         color_img = torch.from_numpy(color_img).float()
-        # color_img = t_resize(color_img)
+        color_img = t_resize(color_img)
 
         depth_gt = depth_gt.transpose(2, 0, 1)
         depth_gt = torch.from_numpy(depth_gt).float()
         # print(depth_gt.max())
         # print(depth_gt.min())
         
-        # depth_gt = t_resize(depth_gt)
+        depth_gt = t_resize(depth_gt)
         return color_img, depth_gt
