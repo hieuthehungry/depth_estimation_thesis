@@ -42,10 +42,10 @@ class KITTIEIGENLoader(Dataset):
         # create a mask 
         # mask = depth > 0
         # mask = depth != 0
-        print(depth)
+        # print(depth)
         mask = torch.logical_and(depth > 1e-3,depth < 10)
         rgb_aif = rgb_aif / 255.0
-        print(mask)
+        # print(mask)
         min = torch.min(depth[mask==1])
         max  = torch.max(depth[mask==1])
         focus_distances = torch.linspace(min,max, steps=self.n_stack)

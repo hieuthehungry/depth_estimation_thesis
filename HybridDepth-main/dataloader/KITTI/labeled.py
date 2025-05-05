@@ -76,6 +76,8 @@ class KITTIEIGENLabeledDataset(Dataset):
         color_img = np.asarray(color_img, dtype=np.float32)
         depth_gt = np.asarray(depth_gt, dtype=np.float32)
         depth_gt = np.expand_dims(depth_gt, axis=2)
+        print(depth_gt.max())
+        print(depth_gt.min())
         depth_gt = depth_gt / 256.0
 
         # remove the borders from depth map since it can cause problem in focal stack creation
@@ -101,7 +103,8 @@ class KITTIEIGENLabeledDataset(Dataset):
 
         depth_gt = depth_gt.transpose(2, 0, 1)
         depth_gt = torch.from_numpy(depth_gt).float()
-        print(depth_gt)
+        print(depth_gt.max())
+        print(depth_gt.min())
         
         # depth_gt = t_resize(depth_gt)
         return color_img, depth_gt
