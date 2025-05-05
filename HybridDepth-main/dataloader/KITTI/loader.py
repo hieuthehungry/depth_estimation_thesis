@@ -42,7 +42,7 @@ class KITTIEIGENLoader(Dataset):
         # create a mask 
         # mask = depth > 0
         # mask = depth != 0
-        
+        print(depth)
         mask = torch.logical_and(depth > 1e-3,depth < 10)
         rgb_aif = rgb_aif / 255.0
         print(mask)
