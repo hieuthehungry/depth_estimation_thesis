@@ -64,6 +64,8 @@ class KITTIEIGENLabeledDataset(Dataset):
 
         
         h, w = self.img_size
+        print(h, w)
+        print(crop_params)
         # Use reflect padding to fill the blank
         color_img = np.array(color_img)
         color_img = np.pad(color_img, ((crop_params.top, h - crop_params.bottom), (crop_params.left, w - crop_params.right), (0, 0)), mode='reflect')
