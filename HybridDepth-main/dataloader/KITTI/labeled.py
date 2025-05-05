@@ -64,8 +64,6 @@ class KITTIEIGENLabeledDataset(Dataset):
 
         
         h, w = self.img_size
-        print(h, w)
-        print(crop_params)
         # Use reflect padding to fill the blank
         color_img = np.array(color_img)
         color_img = np.pad(color_img, ((crop_params.top, h - crop_params.bottom), (crop_params.left, w - crop_params.right), (0, 0)), mode='reflect')
@@ -103,7 +101,7 @@ class KITTIEIGENLabeledDataset(Dataset):
 
         depth_gt = depth_gt.transpose(2, 0, 1)
         depth_gt = torch.from_numpy(depth_gt).float()
-        
+        print(depth_gt)
         
         # depth_gt = t_resize(depth_gt)
         return color_img, depth_gt
