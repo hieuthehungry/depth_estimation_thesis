@@ -107,8 +107,8 @@ class KITTIEIGENLabeledDataset(Dataset):
             depth_gt = Image.open(os.path.join(self.root_dir,self.stage,self.samples_pth[idx].split()[1]))
         else:
             color_img_path = self.root_dir
-            color_img = Image.open(f'{color_img_path}/{self.samples_pth[idx].strip().split()[0]}')
-            depth_gt = Image.open(f'{color_img_path}/{self.samples_pth[idx].strip().split()[1]}')
+            color_img = Image.open(f'{color_img_path}/{self.stage}/{self.samples_pth[idx].strip().split()[0]}')
+            depth_gt = Image.open(f'{color_img_path}/{self.stage}/{self.samples_pth[idx].strip().split()[1]}')
             
 
         if self.stage == 'train':
