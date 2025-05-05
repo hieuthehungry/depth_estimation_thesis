@@ -1,69 +1,5 @@
-# # """A loader for the labeled NYUv2 dataset."""
-# import h5py
-# import numpy as np
-# import torch
-# from torch.utils.data import Dataset
-# from torchvision.transforms import v2 as transforms_v2
 
-# from . import preprocess
-
-# class NYUv2LabeledDataset(Dataset):
-#     """Python interface for the labeled subset of the NYU dataset.
-
-#     To save memory, call the `close()` method of this class to close
-#     the dataset file once you're done using it.
-#     """
-
-#     def __init__(self, path, img_size=(480, 640), remove_white_border=True, stage='test'):
-#         """Opens the labeled dataset file at the given path."""
-#         with open(f'dataloader/NYU/input_splits/{stage}.txt','r') as f:
-#                 self.samples_id= f.readlines()
-                
-        
-#         self.file = h5py.File(path, mode="r")
-#         self.color_maps = self.file["images"]
-#         self.depth_maps = self.file["depths"]
-#         # print(self.color_maps.shape, self.depth_maps.shape)
-
-#         self.img_size = img_size
-#         self.remove_white_border = remove_white_border
-
-#     def close(self):
-#         """Closes the HDF5 file from which the dataset is read."""
-#         self.file.close()
-
-#     def __len__(self):
-#         return len(self.samples_id)
-
-#     def __getitem__(self, idx):
-#         image_index = int(self.samples_id[idx]) - 1
-        
-#         color_img = self.color_maps[image_index]
-#         color_img = color_img.transpose(2, 1, 0)
-#         depth_img = self.depth_maps[image_index]
-#         depth_img = depth_img.transpose(1, 0)
-#         depth_img = depth_img[:, :, np.newaxis]
-
-#         if self.remove_white_border:
-#             color_img, depth_img = preprocess.crop_black_or_white_border(
-#                 color_img, depth_img
-#             )
-
-#         t_resize = transforms_v2.Resize(self.img_size, antialias=True)
-
-#         color_img = color_img.transpose(2, 0, 1)
-#         color_img = torch.from_numpy(color_img).float()
-#         color_img = t_resize(color_img)
-
-#         depth_img = depth_img.transpose(2, 0, 1)
-#         depth_img = torch.from_numpy(depth_img).float()
-#         depth_img = t_resize(depth_img)
-#         return color_img, depth_img
-    
-    
-    
-    
-"""A loader for the labeled NYUv2 dataset."""
+"""A loader for the labeled KITTI EIGEN dataset."""
 import h5py
 import numpy as np
 import torch
@@ -76,7 +12,7 @@ from . import preprocess
 from .preprocess import CropParams, get_white_border, get_black_border
 
 class KITTIEIGENLabeledDataset(Dataset):
-    """Python interface for the labeled subset of the NYU dataset.
+    """Python interface for the labeled subset of the KITTI EIGEN dataset.
 
     To save memory, call the `close()` method of this class to close
     the dataset file once you're done using it.

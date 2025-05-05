@@ -35,10 +35,10 @@ class KITTIEIGENLoader(Dataset):
         self.n_stack = n_stack
         
     def __len__(self) -> int:
-        return len(self.nyuv2_dataset)
+        return len(self.kitti_eigen_dataset)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        rgb_aif, depth = self.nyuv2_dataset[index]
+        rgb_aif, depth = self.kitti_eigen_dataset[index]
         # create a mask 
         # mask = depth > 0
         # mask = depth != 0
