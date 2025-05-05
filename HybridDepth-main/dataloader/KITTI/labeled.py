@@ -39,12 +39,16 @@ class KITTIEIGENLabeledDataset(Dataset):
     def __getitem__(self, idx):
 
         if self.stage == 'test':
+            file_path = self.samples_pth[idx].split()[0]
+            base_dir = os.path.split(file_path)[0]
             color_img = Image.open(os.path.join(self.root_dir, self.stage,self.samples_pth[idx].split()[0]))
-            depth_gt = Image.open(os.path.join(self.root_dir,self.stage,self.samples_pth[idx].split()[1]))
+            depth_gt = Image.open(os.path.join(self.root_dir, self.stage, base_dir, self.samples_pth[idx].split()[1]))
         else:
             color_img_path = self.root_dir
+            file_path = self.samples_pth[idx].split()[0]
+            base_dir = os.path.split(file_path)[0]
             color_img = Image.open(f'{color_img_path}/{self.stage}/{self.samples_pth[idx].strip().split()[0]}')
-            depth_gt = Image.open(f'{color_img_path}/{self.stage}/{self.samples_pth[idx].strip().split()[1]}')
+            depth_gt = Image.open(f'{color_img_path}/{self.stage}/{base_dir}/{self.samples_pth[idx].strip().split()[1]}')
             
 
         if self.stage == 'train':
