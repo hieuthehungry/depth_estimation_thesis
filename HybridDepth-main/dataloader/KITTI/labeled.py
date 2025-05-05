@@ -66,11 +66,11 @@ class KITTIEIGENLabeledDataset(Dataset):
         h, w = self.img_size
         # Use reflect padding to fill the blank
         color_img = np.array(color_img)
-        color_img = np.pad(color_img, ((crop_params.top, h - crop_params.bottom), (crop_params.left, w - crop_params.right), (0, 0)), mode='reflect')
+        # color_img = np.pad(color_img, ((crop_params.top, h - crop_params.bottom), (crop_params.left, w - crop_params.right), (0, 0)), mode='reflect')
         color_img = Image.fromarray(color_img)
 
         depth_gt = np.array(depth_gt)
-        depth_gt = np.pad(depth_gt, ((crop_params.top, h - crop_params.bottom), (crop_params.left, w - crop_params.right)), 'constant', constant_values=0)
+        # depth_gt = np.pad(depth_gt, ((crop_params.top, h - crop_params.bottom), (crop_params.left, w - crop_params.right)), 'constant', constant_values=0)
         depth_gt = Image.fromarray(depth_gt)
         
         color_img = np.asarray(color_img, dtype=np.float32)
