@@ -43,7 +43,7 @@ class KITTIEIGENLoader(Dataset):
         # mask = depth > 0
         # mask = depth != 0
         # print(depth)
-        mask = torch.logical_and(depth > 1e-3,depth < 10)
+        mask = torch.logical_and(depth > 1e-3,depth < 80) # 80 for KITTI
         rgb_aif = rgb_aif / 255.0
         # print(mask)
         min = torch.min(depth[mask==1])
