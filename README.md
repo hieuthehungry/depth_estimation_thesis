@@ -1,2 +1,2 @@
 # depth_estimation_thesis
-Code base for my Master's Thesis for the Data Science Master's program, Hanoi University of Science - Vietnam National University.
+My name is Hieu Minh Pham, an AI engineer based in Hanoi, Vietnam. This is the code for my Data Science Master's Thesis at Hanoi University of Science - Vietnam National University.
