@@ -24,7 +24,7 @@ class KITTIEIGENLabeledDataset(Dataset):
         self.root_dir = path
         self.stage = stage
         """Opens the labeled dataset file at the given path."""
-        with open(f'dataloader/KITTI/input_splits/eigen_{stage}_files_with_gt.txt','r') as f:
+        with open(f'dataloader/KITTI/input_splits/eigen_split_{stage}_files_with_gt_v2.txt','r') as f:
                 self.samples_pth= f.readlines()
 
         self.img_size = img_size
