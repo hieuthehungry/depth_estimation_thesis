@@ -232,7 +232,7 @@ def main_worker(gpu, ngpus_per_node, args):
         try:
             print("== Loaded checkpoint '{}' (global_step {})".format(args.checkpoint_path, checkpoint['global_step']))
         except:
-            global_step = int(args.checkpoint_path.split("-")[1])
+            global_step = int(os.path.basename(args.checkpoint_path).split("-")[1])
             print("== Loaded checkpoint '{}' (global_step {})".format(args.checkpoint_path, global_step))
             
         else:
