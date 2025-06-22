@@ -187,7 +187,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.rank = args.rank * ngpus_per_node + gpu
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank)
 
-    model = PixelFormer(version=args.encoder, inv_depth=False, max_depth=args.max_depth, pretrained=args.pretrain)
+    model = PixelFormerSG(version=args.encoder, inv_depth=False, max_depth=args.max_depth, pretrained=args.pretrain)
     model.train()
 
     num_params = sum([np.prod(p.size()) for p in model.parameters()])
@@ -400,12 +400,13 @@ def main():
         print('train.py is only for training.')
         return -1
 
-    command = 'mkdir ' + os.path.join(args.log_directory, args.model_name)
-    os.system(command)
+    # command = 'mkdir ' + os.path.join(args.log_directory, args.model_name)
+    # os.system(command)
+    os.makedirs(os.path.join(args.log_directory, args.model_name), exist_ok= True)
 
     args_out_path = os.path.join(args.log_directory, args.model_name)
     command = 'cp ' + sys.argv[1] + ' ' + args_out_path
-    os.system(command)
+    # os.system(command)
 
     save_files = True
     if save_files:
