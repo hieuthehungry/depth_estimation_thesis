@@ -80,6 +80,8 @@ parser.add_argument('--garg_crop',                             help='if set, cro
 parser.add_argument('--eval_freq',                 type=int,   help='Online evaluation frequency in global steps', default=500)
 parser.add_argument('--eval_summary_directory',    type=str,   help='output directory for eval summary,'
                                                                     'if empty outputs to checkpoint folder', default='')
+parser.add_argument('--sg_path',                   type=str,   help='path to the scene graph for training', required=False)
+parser.add_argument('--sg_path_eval',            type=str,   help='path to the scene graph for eval', required=False)
 
 if sys.argv.__len__() == 2:
     arg_filename_with_prefix = '@' + sys.argv[1]
