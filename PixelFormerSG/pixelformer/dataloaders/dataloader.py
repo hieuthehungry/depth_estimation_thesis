@@ -222,7 +222,7 @@ class DataLoadPreprocess(Dataset):
         
         if self.transform:
             sample = self.transform(sample)
-        
+            sample["scene_graph"] = scene_graph
         return sample
     
     def rotate_image(self, image, angle, flag=Image.BILINEAR):
