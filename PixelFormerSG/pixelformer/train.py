@@ -15,10 +15,10 @@ from tensorboardX import SummaryWriter
 
 from utils import post_process_depth, flip_lr, silog_loss, compute_errors, eval_metrics, \
                        block_print, enable_print, normalize_result, inv_normalize, convert_arg_line_to_args
-from networks.PixelFormer import PixelFormer
+from networks.PixelFormer import PixelFormerSG
 
 
-parser = argparse.ArgumentParser(description='PixelFormer PyTorch implementation.', fromfile_prefix_chars='@')
+parser = argparse.ArgumentParser(description='PixelFormerSG PyTorch implementation.', fromfile_prefix_chars='@')
 parser.convert_arg_line_to_args = convert_arg_line_to_args
 
 parser.add_argument('--mode',                      type=str,   help='train or test', default='train')
