@@ -54,6 +54,17 @@ import torch
 import torch.nn.functional as F
 from torchvision.ops import roi_align
 
+class ObjTokenProjector(nn.Module):
+    def __init__(self, num_tokens, token_dim=256, embed_dim=512):
+        super().__init__()
+        self.proj = nn.Sequential(
+            nn.Linear(token_dim, embed_dim),
+            nn.GELU(),
+        )
+    def forward(self, obj_tokens):
+        # obj_tokens: [B, num_tokens, token_dim]
+        return self.proj(obj_tokens)  # [B, num_tokens, embed_dim]
+
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
@@ -63,6 +74,7 @@ class PixelFormerSG(nn.Module):
         self.inv_depth = inv_depth
         self.with_auxiliary_head = False
         self.with_neck = False
+        
 
         norm_cfg = dict(type='BN', requires_grad=True)
         # norm_cfg = dict(type='GN', requires_grad=True, num_groups=8)
@@ -98,6 +110,7 @@ class PixelFormerSG(nn.Module):
         )
 
         embed_dim = 512
+        self.obj_projector = ObjTokenProjector(token_dim=256, embed_dim=embed_dim)
         decoder_cfg = dict(
             in_channels=in_channels,
             in_index=[0, 1, 2, 3],
