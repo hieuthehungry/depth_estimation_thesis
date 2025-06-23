@@ -35,9 +35,12 @@ def collate_fn(batch):
     # Example of stacking scene_graph tensors if shapes match
     # if all(sg['obj_logits'].shape == batch[0]['scene_graph']['obj_logits'].shape for sg in scene_graphs):
     # print(scene_graphs)
-    
-    obj_logits = torch.stack([sg['pred_logits'] for sg in scene_graphs])
-    obj_boxes = torch.stack([sg['pred_boxes'] for sg in scene_graphs])
+    if len(b) > 1:
+        obj_logits = torch.stack([sg['pred_logits'] for sg in scene_graphs])
+        obj_boxes = torch.stack([sg['pred_boxes'] for sg in scene_graphs])
+    else:
+        obj_logits = scene_graphs['pred_logits']
+        obj_boxes = scene_graphs['pred_boxes']
     scene_graphs = {'obj_logits': obj_logits, 'obj_boxes': obj_boxes}
     # Otherwise keep as list for your model's custom handling
     return {
@@ -60,7 +63,7 @@ class NewDataLoader(object):
                                    shuffle=(self.train_sampler is None),
                                    num_workers=args.num_threads,
                                    pin_memory=True,
-                                   sampler=self.train_sampler)
+                                   sampler=self.train_sampler, collate_fn = collate_fn)
 
         elif mode == 'online_eval':
             self.testing_samples = DataLoadPreprocess(args, mode, transform=preprocessing_transforms(mode))
@@ -73,11 +76,11 @@ class NewDataLoader(object):
                                    shuffle=False,
                                    num_workers=1,
                                    pin_memory=True,
-                                   sampler=self.eval_sampler)
+                                   sampler=self.eval_sampler,  collate_fn = collate_fn)
         
         elif mode == 'test':
             self.testing_samples = DataLoadPreprocess(args, mode, transform=preprocessing_transforms(mode))
-            self.data = DataLoader(self.testing_samples, 1, shuffle=False, num_workers=1)
+            self.data = DataLoader(self.testing_samples, 1, shuffle=False, num_workers=1,  collate_fn = collate_fn)
 
         else:
             print('mode should be one of \'train, test, online_eval\'. Got {}'.format(mode))
@@ -121,7 +124,7 @@ class DataLoadPreprocess(Dataset):
             scene_graph_path = os.path.join(self.args.sg_path,scene_graph_file)
     
             image = Image.open(image_path)
-            scene_graph = torch.load(scene_graph_path).squeeze()
+            scene_graph = torch.load(scene_graph_path)
             depth_gt = Image.open(depth_path)
             
             
@@ -186,7 +189,7 @@ class DataLoadPreprocess(Dataset):
             scene_graph_file = sample_path.split()[0].replace(".png", ".pt")
             scene_graph_path =  os.path.join(self.args.sg_path_eval,scene_graph_file)
             image = np.asarray(Image.open(image_path), dtype=np.float32) / 255.0
-            scene_graph = torch.load(scene_graph_path).squeeze()
+            scene_graph = torch.load(scene_graph_path)
             
             if self.mode == 'online_eval':
                 gt_path = self.args.gt_path_eval
