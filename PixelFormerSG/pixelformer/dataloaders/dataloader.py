@@ -51,7 +51,7 @@ def collate_fn(batch):
         "image": images,
         "depth": depth,
         "scene_graph": scene_graphs,
-        "focal": torch.tensor([b['focal'] for b in batch],
+        "focal": torch.tensor([b['focal'] for b in batch]),
         "has_valid_depth": has_valid_depth)
     }
 
