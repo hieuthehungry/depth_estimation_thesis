@@ -202,7 +202,7 @@ class DataLoadPreprocess(Dataset):
                     has_valid_depth = True
                 except IOError:
                     depth_gt = False
-                    # print('Missing gt for {}'.format(image_path))
+                    print('Missing gt for {}'.format(image_path))
 
                 if has_valid_depth:
                     depth_gt = np.asarray(depth_gt, dtype=np.float32)
