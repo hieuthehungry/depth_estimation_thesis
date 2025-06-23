@@ -157,7 +157,7 @@ class PixelFormerSG(nn.Module):
                 self.auxiliary_head.init_weights()
     
     def build_obj_tokens(self, imgs, enc_feats, obj_logits, obj_boxes, top_k=8, output_size=(7,7)):
-        print(obj_logits.shape)
+        # print(obj_logits.shape)
         obj_logits = obj_logits.squeeze()
         obj_boxes = obj_boxes.squeeze()
         B, num_queries, num_classes = obj_logits.shape
