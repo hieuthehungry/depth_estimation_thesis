@@ -30,6 +30,10 @@ def collate_fn(batch):
     # print(batch[0])
     images = torch.stack([b['image'] for b in batch])
     depth = torch.stack([torch.as_tensor(b['depth']) for b in batch]) if 'depth' in batch[0] else None
+    try:
+        has_valid_depth = batch[0]["has_valid_depth"] 
+    except:
+        has_valid_depth = None
     scene_graphs = [b['scene_graph'] for b in batch]  # list of dicts
 
     # Example of stacking scene_graph tensors if shapes match
@@ -47,7 +51,8 @@ def collate_fn(batch):
         "image": images,
         "depth": depth,
         "scene_graph": scene_graphs,
-        "focal": torch.tensor([b['focal'] for b in batch])
+        "focal": torch.tensor([b['focal'] for b in batch]
+        "has_valid_depth": has_valid_depth)
     }
 
 class NewDataLoader(object):
