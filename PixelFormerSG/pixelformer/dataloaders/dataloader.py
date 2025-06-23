@@ -52,7 +52,7 @@ def collate_fn(batch):
         "depth": depth,
         "scene_graph": scene_graphs,
         "focal": torch.tensor([b['focal'] for b in batch]),
-        "has_valid_depth": has_valid_depth)
+        "has_valid_depth": has_valid_depth
     }
 
 class NewDataLoader(object):
