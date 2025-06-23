@@ -60,7 +60,7 @@ class NewDataLoader(object):
                                    shuffle=(self.train_sampler is None),
                                    num_workers=args.num_threads,
                                    pin_memory=True,
-                                   sampler=self.train_sampler, collate_fn = collate_fn)
+                                   sampler=self.train_sampler)
 
         elif mode == 'online_eval':
             self.testing_samples = DataLoadPreprocess(args, mode, transform=preprocessing_transforms(mode))
@@ -73,11 +73,11 @@ class NewDataLoader(object):
                                    shuffle=False,
                                    num_workers=1,
                                    pin_memory=True,
-                                   sampler=self.eval_sampler,  collate_fn = collate_fn)
+                                   sampler=self.eval_sampler)
         
         elif mode == 'test':
             self.testing_samples = DataLoadPreprocess(args, mode, transform=preprocessing_transforms(mode))
-            self.data = DataLoader(self.testing_samples, 1, shuffle=False, num_workers=1,  collate_fn = collate_fn)
+            self.data = DataLoader(self.testing_samples, 1, shuffle=False, num_workers=1)
 
         else:
             print('mode should be one of \'train, test, online_eval\'. Got {}'.format(mode))
