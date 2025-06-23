@@ -108,7 +108,7 @@ def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
                 # print('Invalid depth. continue.')
                 continue
 
-            pred_depth = model(image_flipped, obj_logits=obj_logits,
+            pred_depth = model(image, obj_logits=obj_logits,
                                         obj_boxes=obj_boxes)
             if post_process:
                 image_flipped = flip_lr(image)
