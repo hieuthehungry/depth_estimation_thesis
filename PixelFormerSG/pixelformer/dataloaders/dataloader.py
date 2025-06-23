@@ -35,9 +35,9 @@ def collate_fn(batch):
     # Example of stacking scene_graph tensors if shapes match
     # if all(sg['obj_logits'].shape == batch[0]['scene_graph']['obj_logits'].shape for sg in scene_graphs):
     # print(scene_graphs)
-    if len(b) > 1:
-        obj_logits = torch.stack([sg['pred_logits'] for sg in scene_graphs])
-        obj_boxes = torch.stack([sg['pred_boxes'] for sg in scene_graphs])
+    if len(batch) > 1:
+        obj_logits = torch.stack([sg['pred_logits'].squeeze() for sg in scene_graphs])
+        obj_boxes = torch.stack([sg['pred_boxes'].squeeze() for sg in scene_graphs])
     else:
         obj_logits = scene_graphs['pred_logits']
         obj_boxes = scene_graphs['pred_boxes']
