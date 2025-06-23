@@ -39,8 +39,8 @@ def collate_fn(batch):
         obj_logits = torch.stack([sg['pred_logits'].squeeze() for sg in scene_graphs])
         obj_boxes = torch.stack([sg['pred_boxes'].squeeze() for sg in scene_graphs])
     else:
-        obj_logits = scene_graphs['pred_logits']
-        obj_boxes = scene_graphs['pred_boxes']
+        obj_logits = scene_graphs[0]['pred_logits']
+        obj_boxes = scene_graphs[0]['pred_boxes']
     scene_graphs = {'obj_logits': obj_logits, 'obj_boxes': obj_boxes}
     # Otherwise keep as list for your model's custom handling
     return {
