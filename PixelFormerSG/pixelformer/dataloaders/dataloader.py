@@ -29,7 +29,7 @@ def preprocessing_transforms(mode):
 def collate_fn(batch):
     # print(batch[0])
     images = torch.stack([b['image'] for b in batch])
-    depth = torch.stack([b['depth'] for b in batch]) if 'depth' in batch[0] else None
+    depth = torch.stack([torch.as_tensor(b['depth']) for b in batch]) if 'depth' in batch[0] else None
     scene_graphs = [b['scene_graph'] for b in batch]  # list of dicts
 
     # Example of stacking scene_graph tensors if shapes match
