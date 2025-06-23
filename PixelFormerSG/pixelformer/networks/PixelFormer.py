@@ -169,9 +169,9 @@ class PixelFormerSG(nn.Module):
             rois_full = torch.cat([img_inds, rois], dim=1)
 
             # ROI Align
-            scale = enc_feats.size(-1) / float(H)
+            scale = enc_feats[-1].size(-1) / float(H)
             pooled = roi_align(
-                enc_feats, rois_full, output_size=output_size,
+                enc_feats[-1], rois_full, output_size=output_size,
                 spatial_scale=scale, aligned=True
             )  # [top_k, C, output_size[0], output_size[1]]
 
