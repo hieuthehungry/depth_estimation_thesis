@@ -294,9 +294,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
             image = torch.autograd.Variable(sample_batched['image'].cuda(args.gpu, non_blocking=True))
             depth_gt = torch.autograd.Variable(sample_batched['depth'].cuda(args.gpu, non_blocking=True))
-            obj_logits = torch.autograph.Varialble(sample_batched["scene_graph"]['obj_logits'].cuda(gpu, non_blocking=True))   # Shape: [B, num_queries, num_classes]
-            obj_boxes = torch.autograph.Varialble(sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True))
-
+            # obj_logits = torch.autograd.Variable(sample_batched["scene_graph"]['obj_logits'].cuda(gpu, non_blocking=True))   # Shape: [B, num_queries, num_classes]
+            # obj_boxes = torch.autograd.Variable(sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True))
+            obj_logits = sample_batched["scene_graph"]['obj_logits'].cuda(gpu, non_blocking=True)   # Shape: [B, num_queries, num_classes]
+            obj_boxes = sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True)
             depth_est = model(image, obj_logits=obj_logits,
                                         obj_boxes=obj_boxes)
 
