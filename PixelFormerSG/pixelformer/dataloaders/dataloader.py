@@ -228,8 +228,10 @@ class DataLoadPreprocess(Dataset):
         if self.transform:
             sample = self.transform(sample)
             sample["scene_graph"] = scene_graph
-            sample["has_valid_depth"] = has_valid_depth
             sample['path'] =  image_path
+            if self.mode == 'online_eval':
+                sample["has_valid_depth"] = has_valid_depth
+            
         return sample
     
     def rotate_image(self, image, angle, flag=Image.BILINEAR):
