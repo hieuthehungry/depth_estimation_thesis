@@ -121,7 +121,7 @@ class DataLoadPreprocess(Dataset):
             scene_graph_path = os.path.join(self.args.sg_path,scene_graph_file)
     
             image = Image.open(image_path)
-            scene_graph = torch.load(scene_graph_path)
+            scene_graph = torch.load(scene_graph_path).squeeze()
             depth_gt = Image.open(depth_path)
             
             
@@ -186,7 +186,7 @@ class DataLoadPreprocess(Dataset):
             scene_graph_file = sample_path.split()[0].replace(".png", ".pt")
             scene_graph_path =  os.path.join(self.args.sg_path_eval,scene_graph_file)
             image = np.asarray(Image.open(image_path), dtype=np.float32) / 255.0
-            scene_graph = torch.load(scene_graph_path)
+            scene_graph = torch.load(scene_graph_path).squeeze()
             
             if self.mode == 'online_eval':
                 gt_path = self.args.gt_path_eval
