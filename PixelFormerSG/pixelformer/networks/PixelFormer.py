@@ -110,7 +110,7 @@ class PixelFormerSG(nn.Module):
         )
 
         embed_dim = 512
-        self.obj_projector = ObjTokenProjector(token_dim=256, embed_dim=embed_dim)
+        self.obj_projector = ObjTokenProjector(num_tokens = 100, token_dim=256, embed_dim=embed_dim)
         decoder_cfg = dict(
             in_channels=in_channels,
             in_index=[0, 1, 2, 3],
