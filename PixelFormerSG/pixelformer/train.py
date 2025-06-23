@@ -353,7 +353,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 with torch.no_grad():
                     eval_measures = online_eval(model, dataloader_eval, gpu, ngpus_per_node, post_process=True)
                 if eval_measures is not None:
-                    for i in range(9):
+                    for i in range(1):
                         eval_summary_writer.add_scalar(eval_metrics[i], eval_measures[i].cpu(), int(global_step))
                         measure = eval_measures[i]
                         is_best = False
