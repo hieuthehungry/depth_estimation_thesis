@@ -41,6 +41,9 @@ class SceneGraphEncoder(nn.Module):
         outputs = []
         for b in range(B):
             rel_embed = self.embed_rel(edge_types[b])
+            print(x[b].shape)
+            print(edge_indices[b].shape)
+            print(rel_embed.shape)
             out = self.gat(x[b], edge_indices[b], rel_embed)
             outputs.append(out)
         return torch.stack(outputs, dim=0)
