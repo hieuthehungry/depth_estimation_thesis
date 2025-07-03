@@ -107,17 +107,6 @@ class ObjTokenProjector(nn.Module):
         return self.proj(obj_tokens)  # [B, num_tokens, embed_dim]
 
 
-class SceneGraphEncoder(nn.Module):
-    def __init__(self, node_dim, out_dim, rel_classes=50):
-        super().__init__()
-        self.embed_rel = nn.Embedding(rel_classes, node_dim)
-        self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
-
-    def forward(self, x, edge_index, edge_type):
-        rel_embed = self.embed_rel(edge_type)  # [E, D]
-        out = self.gat(x, edge_index, rel_embed)  # [N, out_dim]
-        return out
-
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
