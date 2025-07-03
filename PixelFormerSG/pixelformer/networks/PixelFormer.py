@@ -63,7 +63,7 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
     return edge_index_list, edge_type_list
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, node_dim, out_dim, rel_classes=50):
+    def __init__(self, node_dim, out_dim, rel_classes=51):
         super().__init__()
         self.embed_rel = nn.Embedding(rel_classes, node_dim)
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
@@ -151,7 +151,7 @@ class ObjTokenProjector(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, rel_classes=50, use_roi_align=False, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, rel_classes=51, use_roi_align=False, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
