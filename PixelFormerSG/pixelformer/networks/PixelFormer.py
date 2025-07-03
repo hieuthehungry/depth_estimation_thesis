@@ -78,9 +78,11 @@ class SceneGraphEncoder(nn.Module):
         outputs = []
         for b in range(B):
             rel_embed = self.embed_rel(edge_types[b])
+            print("============================")
             print(x[b].shape)
             print(edge_indices[b].shape)
             print(rel_embed.shape)
+            print("============================")
             out = self.gat(x[b], edge_indices[b], rel_embed)
             outputs.append(out)
         return torch.stack(outputs, dim=0)
@@ -296,7 +298,6 @@ class PixelFormerSG(nn.Module):
 
         elif not self.use_roi_align and all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes', 'pred_boxes']):
             """pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes"""
-            print(scene_graph['pred_boxes'].shape)
             sg_global = self.sg_encoder(scene_graph['pred_logits'], scene_graph['rel_logits'],
                                         scene_graph['sub_boxes'], scene_graph['obj_boxes'],
                                         scene_graph['pred_boxes'])
