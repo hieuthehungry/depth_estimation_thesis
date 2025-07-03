@@ -6,9 +6,21 @@ from .swin_transformer import SwinTransformer
 from .PQI import PSP
 from .SAM import SAM
 from torch_geometric.nn import GATConv
+from torchvision.ops import box_iou
 ########################################################################################################################
 
-def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, threshold=0.5):
+def match_box_indices(sub_boxes, pred_boxes, iou_threshold=0.9):
+    """Return indices of pred_boxes with highest IoU to each sub_box."""
+    
+    matched_indices = []
+    for sb in sub_boxes:
+        ious = box_iou(sb.unsqueeze(0), pred_boxes).squeeze(0)  # [N]
+        max_iou, idx = ious.max(dim=0)
+        matched_indices.append(idx if max_iou > iou_threshold else -1)
+    return matched_indices
+
+
+def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.9):
     edge_index_list = []
     edge_type_list = []
     B, T, R = rel_logits.shape
@@ -17,11 +29,19 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, threshold=0.5):
         edge_type = []
         rel_probs = F.softmax(rel_logits[b], dim=-1)
         pred_rel = torch.argmax(rel_probs, dim=-1)
+
+        sub_idxs = match_box_indices(sub_boxes[b], pred_boxes[b], iou_threshold)
+        obj_idxs = match_box_indices(obj_boxes[b], pred_boxes[b], iou_threshold)
+
         for t in range(T):
-            src_idx = t
-            dst_idx = t
-            edge_index.append([src_idx, dst_idx])
-            edge_type.append(pred_rel[t])
+            si = sub_idxs[t].item()
+            oi = obj_idxs[t].item()
+            if si >= 0 and oi >= 0:
+                edge_index.append([si, oi])
+                edge_type.append(pred_rel[t])
+        if len(edge_index) == 0:  # avoid crash
+            edge_index = [[0, 0]]
+            edge_type = [torch.tensor(0, device=rel_logits.device)]
         edge_index = torch.tensor(edge_index, dtype=torch.long, device=rel_logits.device).T
         edge_type = torch.stack(edge_type)
         edge_index_list.append(edge_index)
@@ -34,10 +54,11 @@ class SceneGraphEncoder(nn.Module):
         self.embed_rel = nn.Embedding(rel_classes, node_dim)
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
 
-    def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes):
+    def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
         B, N, C = pred_logits.shape
         x = pred_logits.softmax(dim=-1)
-        edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits)
+        edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
+
         outputs = []
         for b in range(B):
             rel_embed = self.embed_rel(edge_types[b])
@@ -259,7 +280,8 @@ class PixelFormerSG(nn.Module):
 
         elif not self.use_roi_align and all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes']):
             sg_global = self.sg_encoder(scene_graph['pred_logits'], scene_graph['rel_logits'],
-                                        scene_graph['sub_boxes'], scene_graph['obj_boxes'])
+                                        scene_graph['sub_boxes'], scene_graph['obj_boxes'],
+                                        scene_graph['pred_boxes'])
             sg_global = sg_global.mean(dim=1).unsqueeze(-1).unsqueeze(-1)
             q4 = q4 + sg_global
 
