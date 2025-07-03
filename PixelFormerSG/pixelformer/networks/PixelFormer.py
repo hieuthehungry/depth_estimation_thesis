@@ -74,7 +74,9 @@ class SceneGraphEncoder(nn.Module):
         edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
 
         outputs = []
+        print(self.embed_rel.num_embeddings)
         for b in range(B):
+            
             assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.num_embeddings)), f"Invalid rel class ID: {edge_types[b]}"
             rel_embed = self.embed_rel(edge_types[b])
             print("============================")
@@ -240,7 +242,6 @@ class PixelFormerSG(nn.Module):
                 self.auxiliary_head.init_weights()
     
     def build_obj_tokens(self, imgs, enc_feats, obj_logits, obj_boxes, top_k=8, output_size=(7,7)):
-        # print(obj_logits.shape)
         B, num_queries, num_classes = obj_logits.shape
         device = obj_logits.device
         H, W = imgs.shape[-2:]

@@ -27,7 +27,6 @@ def preprocessing_transforms(mode):
 
 
 def collate_fn(batch):
-    # print(batch[0])
     images = torch.stack([b['image'] for b in batch])
     depth = torch.stack([torch.as_tensor(b['depth']) for b in batch]) if 'depth' in batch[0] else None
     try:
@@ -38,7 +37,6 @@ def collate_fn(batch):
 
     # Example of stacking scene_graph tensors if shapes match
     # if all(sg['obj_logits'].shape == batch[0]['scene_graph']['obj_logits'].shape for sg in scene_graphs):
-    # print(scene_graphs)
     if len(batch) > 1:
         """
             'pred_logits', 'pred_boxes', 'sub_logits', 'sub_boxes', 'obj_logits', 'obj_boxes', 'rel_logits'
@@ -236,7 +234,6 @@ class DataLoadPreprocess(Dataset):
                 sample = {'image': image,  "scene_graph": scene_graph, 'focal': focal}
         
         if self.transform:
-            # print("Did you get to this")
             sample = self.transform(sample)
             sample["scene_graph"] = scene_graph
             sample['path'] =  image_path
