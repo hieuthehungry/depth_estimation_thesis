@@ -294,7 +294,8 @@ class PixelFormerSG(nn.Module):
             obj_mean = obj_tokens.mean(dim=1)[:, :, None, None]  # [B, D_proj, 1, 1]
             q4 = q4 + obj_mean
 
-        elif not self.use_roi_align and all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes']):
+        elif not self.use_roi_align and all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes', 'pred_boxes']):
+            """pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes"""
             sg_global = self.sg_encoder(scene_graph['pred_logits'], scene_graph['rel_logits'],
                                         scene_graph['sub_boxes'], scene_graph['obj_boxes'],
                                         scene_graph['pred_boxes'])
