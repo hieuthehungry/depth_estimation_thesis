@@ -9,16 +9,30 @@ from torch_geometric.nn import GATConv
 from torchvision.ops import box_iou
 ########################################################################################################################
 
-def match_box_indices(sub_boxes, pred_boxes, iou_threshold=0.9):
-    """Return indices of pred_boxes with highest IoU to each sub_box."""
+# def match_box_indices(sub_boxes, pred_boxes, iou_threshold=0.9):
+#     """Return indices of pred_boxes with highest IoU to each sub_box."""
     
+#     matched_indices = []
+#     for sb in sub_boxes:
+#         ious = box_iou(sb.unsqueeze(0), pred_boxes).squeeze(0)  # [N]
+#         max_iou, idx = ious.max(dim=0)
+#         matched_indices.append(idx if max_iou > iou_threshold else -1)
+#     return matched_indices
+
+def match_box_indices(boxes, reference_boxes, iou_threshold=0.9):
+    """
+    boxes: Tensor [T, 4] — each row is (x1, y1, x2, y2)
+    reference_boxes: Tensor [N, 4]
+    Returns a list of matched indices into reference_boxes for each box.
+    """
     matched_indices = []
-    for sb in sub_boxes:
-        ious = box_iou(sb.unsqueeze(0), pred_boxes).squeeze(0)  # [N]
+    for b in boxes:
+        if reference_boxes.size(1) != 4:
+            raise ValueError(f"Expected reference_boxes of shape [N, 4], got {reference_boxes.shape}")
+        ious = box_iou(b.unsqueeze(0), reference_boxes).squeeze(0)  # [N]
         max_iou, idx = ious.max(dim=0)
         matched_indices.append(idx if max_iou > iou_threshold else -1)
     return matched_indices
-
 
 def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.9):
     edge_index_list = []
