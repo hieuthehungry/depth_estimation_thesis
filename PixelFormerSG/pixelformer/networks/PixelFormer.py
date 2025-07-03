@@ -48,8 +48,8 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
         obj_idxs = match_box_indices(obj_boxes[b], pred_boxes[b], iou_threshold)
 
         for t in range(T):
-            si = sub_idxs[t].item()
-            oi = obj_idxs[t].item()
+            si = sub_idxs[t]
+            oi = obj_idxs[t]
             if si >= 0 and oi >= 0:
                 edge_index.append([si, oi])
                 edge_type.append(pred_rel[t])
