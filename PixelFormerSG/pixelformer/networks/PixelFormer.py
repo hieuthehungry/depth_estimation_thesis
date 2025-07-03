@@ -71,12 +71,11 @@ class SceneGraphEncoder(nn.Module):
     def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
         B, N, C = pred_logits.shape
         x = pred_logits.softmax(dim=-1)
-        print("heehee")
-        print(pred_boxes.shape)
         edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
 
         outputs = []
         for b in range(B):
+            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.num_embeddings)), f"Invalid rel class ID: {edge_types[b]}"
             rel_embed = self.embed_rel(edge_types[b])
             print("============================")
             print(x[b].shape)
