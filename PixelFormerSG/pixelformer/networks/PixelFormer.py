@@ -74,16 +74,16 @@ class SceneGraphEncoder(nn.Module):
         edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
 
         outputs = []
-        print(self.embed_rel.num_embeddings)
+        # print(self.embed_rel.num_embeddings)
         for b in range(B):
             
             assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.num_embeddings)), f"Invalid rel class ID: {edge_types[b]}"
             rel_embed = self.embed_rel(edge_types[b])
-            print("============================")
-            print(x[b].shape)
-            print(edge_indices[b].shape)
-            print(rel_embed.shape)
-            print("============================")
+            # print("============================")
+            # print(x[b].shape)
+            # print(edge_indices[b].shape)
+            # print(rel_embed.shape)
+            # print("============================")
             out = self.gat(x[b], edge_indices[b], rel_embed)
             outputs.append(out)
         return torch.stack(outputs, dim=0)
