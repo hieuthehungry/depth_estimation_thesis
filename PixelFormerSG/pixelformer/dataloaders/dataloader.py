@@ -40,13 +40,18 @@ def collate_fn(batch):
     # if all(sg['obj_logits'].shape == batch[0]['scene_graph']['obj_logits'].shape for sg in scene_graphs):
     # print(scene_graphs)
     if len(batch) > 1:
-        obj_logits = torch.stack([sg['pred_logits'].squeeze() for sg in scene_graphs])
-        obj_boxes = torch.stack([sg['pred_boxes'].squeeze() for sg in scene_graphs])
+        """
+            'pred_logits', 'pred_boxes', 'sub_logits', 'sub_boxes', 'obj_logits', 'obj_boxes', 'rel_logits'
+        """
+        batched_scene_graphs = {'pred_logits': None, 'pred_boxes': None, 
+                                'sub_logits': None, 'sub_boxes': None, 'obj_logits': None, 
+                                'obj_boxes': None, 'rel_logits': None}
+        for key in batched_scene_graphs.keys():    
+            batched_scene_graphs[key] = torch.stack([sg['pred_logits'].squeeze() for sg in scene_graphs])
     else:
-        obj_logits = scene_graphs[0]['pred_logits']
-        obj_boxes = scene_graphs[0]['pred_boxes']
-    scene_graphs = {'obj_logits': obj_logits, 'obj_boxes': obj_boxes}
+        batched_scene_graphs = scene_graphs[0]
     # Otherwise keep as list for your model's custom handling
+    
     return {
         "image": images,
         "depth": depth,

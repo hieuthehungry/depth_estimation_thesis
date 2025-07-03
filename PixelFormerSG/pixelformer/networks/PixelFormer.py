@@ -5,7 +5,48 @@ import torch.nn.functional as F
 from .swin_transformer import SwinTransformer
 from .PQI import PSP
 from .SAM import SAM
+from torch_geometric.nn import GATConv
 ########################################################################################################################
+
+def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, threshold=0.5):
+    edge_index_list = []
+    edge_type_list = []
+    B, T, R = rel_logits.shape
+    for b in range(B):
+        edge_index = []
+        edge_type = []
+        rel_probs = F.softmax(rel_logits[b], dim=-1)
+        pred_rel = torch.argmax(rel_probs, dim=-1)
+        for t in range(T):
+            src_idx = t
+            dst_idx = t
+            edge_index.append([src_idx, dst_idx])
+            edge_type.append(pred_rel[t])
+        edge_index = torch.tensor(edge_index, dtype=torch.long, device=rel_logits.device).T
+        edge_type = torch.stack(edge_type)
+        edge_index_list.append(edge_index)
+        edge_type_list.append(edge_type)
+    return edge_index_list, edge_type_list
+
+class SceneGraphEncoder(nn.Module):
+    def __init__(self, node_dim, out_dim, rel_classes=50):
+        super().__init__()
+        self.embed_rel = nn.Embedding(rel_classes, node_dim)
+        self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
+
+    def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes):
+        B, N, C = pred_logits.shape
+        x = pred_logits.softmax(dim=-1)
+        edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits)
+        outputs = []
+        for b in range(B):
+            rel_embed = self.embed_rel(edge_types[b])
+            out = self.gat(x[b], edge_indices[b], rel_embed)
+            outputs.append(out)
+        return torch.stack(outputs, dim=0)
+
+
+
 
 class BCP(nn.Module):
     """ Multilayer perceptron."""
@@ -65,10 +106,22 @@ class ObjTokenProjector(nn.Module):
         # obj_tokens: [B, num_tokens, token_dim]
         return self.proj(obj_tokens)  # [B, num_tokens, embed_dim]
 
+
+class SceneGraphEncoder(nn.Module):
+    def __init__(self, node_dim, out_dim, rel_classes=50):
+        super().__init__()
+        self.embed_rel = nn.Embedding(rel_classes, node_dim)
+        self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
+
+    def forward(self, x, edge_index, edge_type):
+        rel_embed = self.embed_rel(edge_type)  # [E, D]
+        out = self.gat(x, edge_index, rel_embed)  # [N, out_dim]
+        return out
+
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=256, out_dim=512, rel_classes=50, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
@@ -136,7 +189,7 @@ class PixelFormerSG(nn.Module):
         self.disp_head1 = DispHead(input_dim=sam_dims[0])
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
-
+        self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim, rel_classes=rel_classes)
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
@@ -195,7 +248,7 @@ class PixelFormerSG(nn.Module):
 
         return torch.stack(obj_embeddings, dim=0)  # [B, top_k, D_proj]
     
-    def forward(self, imgs, obj_logits=None, obj_boxes=None):
+    def forward(self, imgs, scene_graph):
 
         enc_feats = self.backbone(imgs)
         if self.with_neck:
@@ -214,6 +267,17 @@ class PixelFormerSG(nn.Module):
         # Mean pooling across tokens
             obj_mean = obj_tokens.mean(dim=1)[:, :, None, None]  # [B, D_proj, 1, 1]
             q4 = q4 + obj_mean
+
+        if 'obj_logits' in scene_graph and 'obj_boxes' in scene_graph:
+            obj_tokens = self.build_obj_tokens(imgs, enc_feats, scene_graph['obj_logits'], scene_graph['obj_boxes'])
+            obj_mean = obj_tokens.mean(dim=1)[:, :, None, None]
+            q4 = q4 + obj_mean
+
+        if all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes']):
+            sg_global = self.sg_encoder(scene_graph['pred_logits'], scene_graph['rel_logits'],
+                                        scene_graph['sub_boxes'], scene_graph['obj_boxes'])
+            sg_global = sg_global.mean(dim=1).unsqueeze(-1).unsqueeze(-1)
+            q4 = q4 + sg_global
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)

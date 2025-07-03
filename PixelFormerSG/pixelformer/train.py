@@ -12,6 +12,7 @@ import numpy as np
 from tqdm import tqdm
 
 from tensorboardX import SummaryWriter
+from time import time
 
 from utils import post_process_depth, flip_lr, silog_loss, compute_errors, eval_metrics, \
                        block_print, enable_print, normalize_result, inv_normalize, convert_arg_line_to_args
@@ -97,6 +98,7 @@ elif args.dataset == 'kittipred':
 
 def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
     eval_measures = torch.zeros(10).cuda(device=gpu)
+    timer = []
     for _, eval_sample_batched in enumerate(tqdm(dataloader_eval.data)):
         # print(eval_sample_batched)
         with torch.no_grad():
@@ -104,11 +106,12 @@ def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
             gt_depth = eval_sample_batched['depth']
             obj_logits = eval_sample_batched["scene_graph"]['obj_logits'].cuda(gpu, non_blocking=True)   # Shape: [B, num_queries, num_classes]
             obj_boxes = eval_sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True)    # Shape: [B, num_queries, 4]
+            rel = eval_sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True)
             has_valid_depth = eval_sample_batched['has_valid_depth']
             if not has_valid_depth:
                 # print('Invalid depth. continue.')
                 continue
-
+            start_time = time()
             pred_depth = model(image, obj_logits=obj_logits,
                                         obj_boxes=obj_boxes)
             if post_process:
@@ -116,10 +119,11 @@ def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
                 pred_depth_flipped = model(image_flipped, obj_logits=obj_logits,
                                         obj_boxes=obj_boxes)
                 pred_depth = post_process_depth(pred_depth, pred_depth_flipped)
-
+            end_time = time()
+            timer.append(end_time - start_time)
             pred_depth = pred_depth.cpu().numpy().squeeze()
             gt_depth = gt_depth.cpu().numpy().squeeze()
-
+        
         if args.do_kb_crop:
             height, width = gt_depth.shape
             top_margin = int(height - 352)

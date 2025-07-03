@@ -25,6 +25,26 @@ def preprocessing_transforms(mode):
     ])
 
 
+def collate_fn(batch):
+    print(batch[0])
+    images = torch.stack([b['image'] for b in batch])
+    depth = torch.stack([b['depth'] for b in batch]) if 'depth' in batch[0] else None
+    scene_graphs = [b['scene_graph'] for b in batch]  # list of dicts
+
+    # Example of stacking scene_graph tensors if shapes match
+    if all(sg['obj_logits'].shape == batch[0]['scene_graph']['obj_logits'].shape for sg in scene_graphs):
+        obj_logits = torch.stack([sg['obj_logits'] for sg in scene_graphs])
+        obj_boxes = torch.stack([sg['obj_boxes'] for sg in scene_graphs])
+        scene_graphs = {'obj_logits': obj_logits, 'obj_boxes': obj_boxes}
+    # Otherwise keep as list for your model's custom handling
+    return {
+        "image": images,
+        "depth": depth,
+        "scene_graph": scene_graphs,
+        "focal": torch.tensor([b['focal'] for b in batch])
+    }
+
+
 class NewDataLoader(object):
     def __init__(self, args, mode):
         if mode == 'train':
@@ -38,7 +58,7 @@ class NewDataLoader(object):
                                    shuffle=(self.train_sampler is None),
                                    num_workers=args.num_threads,
                                    pin_memory=True,
-                                   sampler=self.train_sampler)
+                                   sampler=self.train_sampler, collate_fn = collate_fn)
 
         elif mode == 'online_eval':
             self.testing_samples = DataLoadPreprocess(args, mode, transform=preprocessing_transforms(mode))
@@ -51,15 +71,15 @@ class NewDataLoader(object):
                                    shuffle=False,
                                    num_workers=1,
                                    pin_memory=True,
-                                   sampler=self.eval_sampler)
+                                   sampler=self.eval_sampler,  collate_fn = collate_fn)
         
         elif mode == 'test':
             self.testing_samples = DataLoadPreprocess(args, mode, transform=preprocessing_transforms(mode))
-            self.data = DataLoader(self.testing_samples, 1, shuffle=False, num_workers=1)
+            self.data = DataLoader(self.testing_samples, 1, shuffle=False, num_workers=1,  collate_fn = collate_fn)
 
         else:
             print('mode should be one of \'train, test, online_eval\'. Got {}'.format(mode))
-            
+
             
 class DataLoadPreprocess(Dataset):
     def __init__(self, args, mode, transform=None, is_for_online_eval=False):
