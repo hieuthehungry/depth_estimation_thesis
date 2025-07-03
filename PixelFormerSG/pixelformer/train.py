@@ -103,20 +103,18 @@ def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
         with torch.no_grad():
             image = torch.autograd.Variable(eval_sample_batched['image'].cuda(gpu, non_blocking=True))
             gt_depth = eval_sample_batched['depth']
-            obj_logits = eval_sample_batched["scene_graph"]['obj_logits'].cuda(gpu, non_blocking=True)   # Shape: [B, num_queries, num_classes]
-            obj_boxes = eval_sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True)    # Shape: [B, num_queries, 4]
-            rel = eval_sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True)
+            scene_graph = eval_sample_batched["scene_graph"]
+            scene_graph =  {key: scene_graph[key].cuda(gpu, non_blocking=True) for key in scene_graph.keys()}
             has_valid_depth = eval_sample_batched['has_valid_depth']
             if not has_valid_depth:
                 # print('Invalid depth. continue.')
                 continue
             start_time = time()
-            pred_depth = model(image, obj_logits=obj_logits,
-                                        obj_boxes=obj_boxes)
+            pred_depth = model(image, scene_graph = scene_graph
+                                        )
             if post_process:
                 image_flipped = flip_lr(image)
-                pred_depth_flipped = model(image_flipped, obj_logits=obj_logits,
-                                        obj_boxes=obj_boxes)
+                pred_depth_flipped = model(image_flipped, scene_graph = scene_graph)
                 pred_depth = post_process_depth(pred_depth, pred_depth_flipped)
             end_time = time()
             timer.append(end_time - start_time)
@@ -298,12 +296,11 @@ def main_worker(gpu, ngpus_per_node, args):
 
             image = torch.autograd.Variable(sample_batched['image'].cuda(args.gpu, non_blocking=True))
             depth_gt = torch.autograd.Variable(sample_batched['depth'].cuda(args.gpu, non_blocking=True))
-            # obj_logits = torch.autograd.Variable(sample_batched["scene_graph"]['obj_logits'].cuda(gpu, non_blocking=True))   # Shape: [B, num_queries, num_classes]
-            # obj_boxes = torch.autograd.Variable(sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True))
-            obj_logits = sample_batched["scene_graph"]['obj_logits'].cuda(gpu, non_blocking=True)   # Shape: [B, num_queries, num_classes]
-            obj_boxes = sample_batched["scene_graph"]['obj_boxes'].cuda(gpu, non_blocking=True)
-            depth_est = model(image, obj_logits=obj_logits,
-                                        obj_boxes=obj_boxes)
+
+            scene_graph = sample_batched["scene_graph"]
+            scene_graph =  {key: scene_graph[key].cuda(gpu, non_blocking=True) for key in scene_graph.keys()}
+            depth_est = model(image, scene_graph = scene_graph
+                                        )
 
             if args.dataset == 'nyu':
                 mask = depth_gt > 0.1
