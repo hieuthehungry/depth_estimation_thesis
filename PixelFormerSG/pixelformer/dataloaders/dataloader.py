@@ -47,7 +47,7 @@ def collate_fn(batch):
                                 'sub_logits': None, 'sub_boxes': None, 'obj_logits': None, 
                                 'obj_boxes': None, 'rel_logits': None}
         for key in batched_scene_graphs.keys():    
-            batched_scene_graphs[key] = torch.stack([sg['pred_logits'].squeeze() for sg in scene_graphs])
+            batched_scene_graphs[key] = torch.stack([sg[key].squeeze() for sg in scene_graphs])
     else:
         batched_scene_graphs = scene_graphs[0]
     # Otherwise keep as list for your model's custom handling
