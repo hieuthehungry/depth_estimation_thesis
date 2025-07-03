@@ -121,13 +121,13 @@ class SceneGraphEncoder(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=256, out_dim=512, rel_classes=50, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=256, out_dim=512, rel_classes=50, use_roi_align=False, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
         self.with_auxiliary_head = False
         self.with_neck = False
-        
+        self.use_roi_align=use_roi_align
 
         norm_cfg = dict(type='BN', requires_grad=True)
         # norm_cfg = dict(type='GN', requires_grad=True, num_groups=8)
@@ -258,22 +258,14 @@ class PixelFormerSG(nn.Module):
 
         # NEW: condition q4 with object tokens
         # 2. Conditionally incorporate object tokens
-        if obj_logits is not None and obj_boxes is not None:
-        # Build object tokens
-            obj_tokens = self.build_obj_tokens(
-            imgs, enc_feats, obj_logits, obj_boxes, top_k=8, output_size=(7,7)
-        )                                     # [B, top_k, D_proj]
 
-        # Mean pooling across tokens
+        if self.use_roi_align and 'obj_logits' in scene_graph and 'obj_boxes' in scene_graph:
+            obj_tokens = self.build_obj_tokens(imgs, enc_feats, scene_graph['obj_logits'], scene_graph['obj_boxes'],
+                                                p_k=8, output_size=(7,7))  # [B, top_k, D_proj]
             obj_mean = obj_tokens.mean(dim=1)[:, :, None, None]  # [B, D_proj, 1, 1]
             q4 = q4 + obj_mean
 
-        if 'obj_logits' in scene_graph and 'obj_boxes' in scene_graph:
-            obj_tokens = self.build_obj_tokens(imgs, enc_feats, scene_graph['obj_logits'], scene_graph['obj_boxes'])
-            obj_mean = obj_tokens.mean(dim=1)[:, :, None, None]
-            q4 = q4 + obj_mean
-
-        if all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes']):
+        elif not self.use_roi_align and all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes']):
             sg_global = self.sg_encoder(scene_graph['pred_logits'], scene_graph['rel_logits'],
                                         scene_graph['sub_boxes'], scene_graph['obj_boxes'])
             sg_global = sg_global.mean(dim=1).unsqueeze(-1).unsqueeze(-1)

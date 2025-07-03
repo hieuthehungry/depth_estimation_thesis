@@ -5,14 +5,13 @@ import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-import os, sys, time
+import os, sys
 from telnetlib import IP
 import argparse
 import numpy as np
 from tqdm import tqdm
-
-from tensorboardX import SummaryWriter
 from time import time
+from tensorboardX import SummaryWriter
 
 from utils import post_process_depth, flip_lr, silog_loss, compute_errors, eval_metrics, \
                        block_print, enable_print, normalize_result, inv_normalize, convert_arg_line_to_args
@@ -273,7 +272,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     silog_criterion = silog_loss(variance_focus=args.variance_focus)
 
-    start_time = time.time()
+    start_time = time()
     duration = 0
 
     num_log_images = args.batch_size
@@ -295,7 +294,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         for step, sample_batched in enumerate(dataloader.data):
             optimizer.zero_grad()
-            before_op_time = time.time()
+            before_op_time = time()
 
             image = torch.autograd.Variable(sample_batched['image'].cuda(args.gpu, non_blocking=True))
             depth_gt = torch.autograd.Variable(sample_batched['depth'].cuda(args.gpu, non_blocking=True))
@@ -325,14 +324,14 @@ def main_worker(gpu, ngpus_per_node, args):
                     print('NaN in loss occurred. Aborting training.')
                     return -1
 
-            duration += time.time() - before_op_time
+            duration += time() - before_op_time
             if global_step and global_step % args.log_freq == 0 and not model_just_loaded:
                 var_sum = [var.sum().item() for var in model.parameters() if var.requires_grad]
                 var_cnt = len(var_sum)
                 var_sum = np.sum(var_sum)
                 examples_per_sec = args.batch_size / duration * args.log_freq
                 duration = 0
-                time_sofar = (time.time() - start_time) / 3600
+                time_sofar = (time() - start_time) / 3600
                 training_time_left = (num_total_steps / global_step - 1.0) * time_sofar
                 if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     print("{}".format(args.model_name))
