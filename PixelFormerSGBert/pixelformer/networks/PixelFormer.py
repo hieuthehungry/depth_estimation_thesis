@@ -43,6 +43,7 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
         edge_type = []
         rel_probs = F.softmax(rel_logits[b], dim=-1)
         pred_rel = torch.argmax(rel_probs, dim=-1)
+        pred_rel = pred_rel.clamp(max=len(REL_CLASSES) - 1)
 
         sub_idxs = match_box_indices(sub_boxes[b], pred_boxes[b], iou_threshold)
         obj_idxs = match_box_indices(obj_boxes[b], pred_boxes[b], iou_threshold)
@@ -115,7 +116,7 @@ class SceneGraphEncoder(nn.Module):
         # print(self.embed_rel.num_embeddings)
         for b in range(B):
             num_rels = self.embed_rel.input_ids.size(0)  # Get number of relation types
-            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < num_rels)), f"Invalid rel class ID: {edge_types[b]}"
+            assert torch.all((edge_types[b] >= 0) & (edge_types[b] <= num_rels)), f"Invalid rel class ID: {edge_types[b]}"
             device = x[b].device
             self.embed_rel.to(x.device)
             rel_embed = self.embed_rel(edge_types[b].to(device))  # <- explicitly align device
