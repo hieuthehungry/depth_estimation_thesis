@@ -80,15 +80,15 @@ class BertRelationEncoder(nn.Module):
             param.requires_grad = False
 
         # Tokenize once (still needed each forward)
-        tokens = self.tokenizer(rel_classes, padding=True, return_tensors='pt')
-        self.register_buffer('input_ids', tokens['input_ids'])
-        self.register_buffer('attention_mask', tokens['attention_mask'])
+        self.tokens = self.tokenizer(rel_classes, padding=True, return_tensors='pt')
+        self.register_buffer('input_ids', self.tokens['input_ids'])
+        self.register_buffer('attention_mask', self.tokens['attention_mask'])
 
     def forward(self, rel_type_ids):
         with torch.no_grad():
             outputs = self.bert(
-                input_ids=self.input_ids,
-                attention_mask=self.attention_mask
+                input_ids=self.tokens['input_ids'],
+                attention_mask= self.tokens['attention_mask']
             )
         cls_embed = outputs.last_hidden_state[:, 0, :]  # [num_rel, hidden]
         rel_emb = self.linear(cls_embed)                # [num_rel, out_dim]
