@@ -256,7 +256,7 @@ class PixelFormerSG(nn.Module):
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim, rel_classes=REL_CLASSES)
-        print(self.sg_encoder.device)
+        # print(self.sg_encoder.device)
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
