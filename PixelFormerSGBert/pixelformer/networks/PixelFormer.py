@@ -180,7 +180,7 @@ class ObjTokenProjector(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, rel_classes=52, use_roi_align=False, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, use_roi_align=False, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
@@ -248,7 +248,7 @@ class PixelFormerSG(nn.Module):
         self.disp_head1 = DispHead(input_dim=sam_dims[0])
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
-        self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim, rel_classes=rel_classes)
+        self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim, rel_classes=REL_CLASSES)
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
