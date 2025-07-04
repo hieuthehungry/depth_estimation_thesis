@@ -78,9 +78,13 @@ class BertRelationEncoder(nn.Module):
         self.rel_embeddings = self._encode_relations(self.rel_tokens)
 
     def to(self, *args, **kwargs):
-        # Ensures the model moves correctly across devices
+        """Ensure BERT and buffers move with the module"""
         super().to(*args, **kwargs)
-        self.bert.to(*args, **kwargs)
+        device = kwargs.get('device', args[0] if args else None)
+        if device is not None:
+            self.bert = self.bert.to(device)
+            if self.rel_embeddings is not None:
+                self.rel_embeddings = self.rel_embeddings.to(device)
         return self
 
     def _encode_relations(self, rel_texts):
@@ -100,6 +104,8 @@ class SceneGraphEncoder(nn.Module):
     def __init__(self, node_dim, out_dim, rel_classes=REL_CLASSES):
         super().__init__()
         self.embed_rel = BertRelationEncoder(rel_classes, out_dim=out_dim)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.embed_rel.to(device)
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
 
     def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
