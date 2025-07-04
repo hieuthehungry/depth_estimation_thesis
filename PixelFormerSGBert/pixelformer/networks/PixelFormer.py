@@ -74,6 +74,7 @@ class BertRelationEncoder(nn.Module):
         self.bert = BertModel.from_pretrained(pretrained_model)
         self.linear = nn.Linear(self.bert.config.hidden_size, out_dim)
         self.rel_tokens = rel_classes  # list of relation strings
+        print(self.rel_tokens)
         self.rel_embeddings = self._encode_relations(self.rel_tokens)
 
     def _encode_relations(self, rel_texts):
