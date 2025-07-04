@@ -193,7 +193,7 @@ class ObjTokenProjector(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=512, out_dim=512, use_roi_align=False, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, use_roi_align=False, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
