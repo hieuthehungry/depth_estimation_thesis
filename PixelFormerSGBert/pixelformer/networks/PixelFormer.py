@@ -122,11 +122,11 @@ class SceneGraphEncoder(nn.Module):
             rel_embed = self.embed_rel(edge_types[b].to(device))  # <- explicitly align device
             edge_idx = edge_indices[b].to(device)            
 
-            print("============================")
-            print(x[b].device)
-            print(edge_idx.device)
-            print(rel_embed.device)
-            print("============================")
+            # print("============================")
+            # print(x[b].device)
+            # print(edge_idx.device)
+            # print(rel_embed.device)
+            # print("============================")
             out = self.gat(x[b], edge_idx, rel_embed)
             outputs.append(out)
         return torch.stack(outputs, dim=0)
