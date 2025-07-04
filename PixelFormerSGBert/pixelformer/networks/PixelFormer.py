@@ -74,7 +74,7 @@ class BertRelationEncoder(nn.Module):
         self.bert = BertModel.from_pretrained(pretrained_model)
         self.linear = nn.Linear(self.bert.config.hidden_size, out_dim)
         self.rel_tokens = rel_classes  # list of relation strings
-        print(self.rel_tokens)
+        # print(self.rel_tokens)
         self.rel_embeddings = self._encode_relations(self.rel_tokens)
 
     def _encode_relations(self, rel_texts):
@@ -104,7 +104,7 @@ class SceneGraphEncoder(nn.Module):
         # print(self.embed_rel.num_embeddings)
         for b in range(B):
             
-            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.num_embeddings)), f"Invalid rel class ID: {edge_types[b]}"
+            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.rel_embeddings.shape[0])), f"Invalid rel class ID: {edge_types[b]}"
             rel_embed = self.embed_rel(edge_types[b])
             # print("============================")
             # print(x[b].shape)
