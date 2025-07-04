@@ -65,7 +65,7 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
 from transformers import BertTokenizer, BertModel
 import torch.nn as nn
 import torch
-from obj_and_rel import REL_CLASSES 
+from .obj_and_rel import REL_CLASSES 
 
 class BertRelationEncoder(nn.Module):
     def __init__(self, rel_classes: list, pretrained_model='bert-base-uncased', out_dim=256):
