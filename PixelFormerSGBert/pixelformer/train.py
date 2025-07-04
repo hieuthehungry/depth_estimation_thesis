@@ -313,6 +313,9 @@ def main_worker(gpu, ngpus_per_node, args):
                 current_lr = (args.learning_rate - end_learning_rate) * (1 - global_step / num_total_steps) ** 0.9 + end_learning_rate
                 param_group['lr'] = current_lr
 
+            for name, param in model.named_parameters():
+                if param.grad is not None and param.device != param.grad.device:
+                    print(f"[Mismatch] {name}: param on {param.device}, grad on {param.grad.device}")
             optimizer.step()
 
             if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
