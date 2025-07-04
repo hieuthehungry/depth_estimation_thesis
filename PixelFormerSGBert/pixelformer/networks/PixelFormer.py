@@ -114,8 +114,8 @@ class SceneGraphEncoder(nn.Module):
         outputs = []
         # print(self.embed_rel.num_embeddings)
         for b in range(B):
-            
-            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.rel_embeddings.shape[0])), f"Invalid rel class ID: {edge_types[b]}"
+            num_rels = self.embed_rel.input_ids.size(0)  # Get number of relation types
+            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < num_rels)), f"Invalid rel class ID: {edge_types[b]}"
             device = x[b].device
             self.embed_rel.to(x.device)
             rel_embed = self.embed_rel(edge_types[b].to(device))  # <- explicitly align device
