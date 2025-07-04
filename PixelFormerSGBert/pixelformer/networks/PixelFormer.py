@@ -73,31 +73,27 @@ class BertRelationEncoder(nn.Module):
         self.tokenizer = BertTokenizer.from_pretrained(pretrained_model)
         self.bert = BertModel.from_pretrained(pretrained_model)
         self.linear = nn.Linear(self.bert.config.hidden_size, out_dim)
-        self.rel_tokens = rel_classes  # list of relation strings
-        # print(self.rel_tokens)
-        self.rel_embeddings = self._encode_relations(self.rel_tokens)
+        self.rel_tokens = rel_classes
 
-    def to(self, *args, **kwargs):
-        """Ensure BERT and buffers move with the module"""
-        super().to(*args, **kwargs)
-        device = kwargs.get('device', args[0] if args else None)
-        if device is not None:
-            self.bert = self.bert.to(device)
-            if self.rel_embeddings is not None:
-                self.rel_embeddings = self.rel_embeddings.to(device)
-        return self
+        # Freeze BERT, but keep linear trainable
+        for param in self.bert.parameters():
+            param.requires_grad = False
 
-    def _encode_relations(self, rel_texts):
-        with torch.no_grad():
-            tokens = self.tokenizer(rel_texts, padding=True, return_tensors='pt')
-            outputs = self.bert(**tokens)
-            cls_embeddings = outputs.last_hidden_state[:, 0, :]  # CLS token
-        return self.linear(cls_embeddings)  # [num_rel, out_dim]
+        # Tokenize once (still needed each forward)
+        tokens = self.tokenizer(rel_classes, padding=True, return_tensors='pt')
+        self.register_buffer('input_ids', tokens['input_ids'])
+        self.register_buffer('attention_mask', tokens['attention_mask'])
 
     def forward(self, rel_type_ids):
-        # rel_type_ids: (num_edges,) integer tensor
-        rel_type_ids = rel_type_ids.to(self.rel_embeddings.device)
-        return self.rel_embeddings[rel_type_ids]
+        with torch.no_grad():
+            outputs = self.bert(
+                input_ids=self.input_ids,
+                attention_mask=self.attention_mask
+            )
+        cls_embed = outputs.last_hidden_state[:, 0, :]  # [num_rel, hidden]
+        rel_emb = self.linear(cls_embed)                # [num_rel, out_dim]
+        return rel_emb[rel_type_ids.to(rel_emb.device)] # [num_edges, out_dim]
+
 
 
 class SceneGraphEncoder(nn.Module):
