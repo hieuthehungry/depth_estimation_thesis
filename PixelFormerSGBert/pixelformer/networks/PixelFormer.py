@@ -120,9 +120,9 @@ class SceneGraphEncoder(nn.Module):
             assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.rel_embeddings.shape[0])), f"Invalid rel class ID: {edge_types[b]}"
             rel_embed = self.embed_rel(edge_types[b])
             print("============================")
-            print(x[b].device)
-            print(edge_indices[b].device)
-            print(rel_embed.device)
+            print(x[b].shape)
+            print(edge_indices[b].shape)
+            print(rel_embed.shape)
             print("============================")
             out = self.gat(x[b], edge_indices[b], rel_embed)
             outputs.append(out)
