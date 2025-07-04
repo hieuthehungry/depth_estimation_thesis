@@ -87,7 +87,7 @@ class BertRelationEncoder(nn.Module):
     def forward(self, rel_type_ids):
         with torch.no_grad():
             outputs = self.bert(
-                input_ids=self.input_ids',
+                input_ids=self.input_ids,
                 attention_mask= self.attention_mask
             )
         cls_embed = outputs.last_hidden_state[:, 0, :]  # [num_rel, hidden]
