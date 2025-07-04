@@ -107,10 +107,12 @@ class SceneGraphEncoder(nn.Module):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.embed_rel.to(device)
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
+        self.node_proj = nn.Linear(152, node_dim)  # Project pred_logits to node_dim
 
     def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
         B, N, C = pred_logits.shape
         x = pred_logits.softmax(dim=-1)
+        x = self.node_proj(x)  
         edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
 
         outputs = []
@@ -119,11 +121,11 @@ class SceneGraphEncoder(nn.Module):
             
             assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.rel_embeddings.shape[0])), f"Invalid rel class ID: {edge_types[b]}"
             rel_embed = self.embed_rel(edge_types[b])
-            print("============================")
-            print(x[b].shape)
-            print(edge_indices[b].shape)
-            print(rel_embed.shape)
-            print("============================")
+            # print("============================")
+            # print(x[b].shape)
+            # print(edge_indices[b].shape)
+            # print(rel_embed.shape)
+            # print("============================")
             out = self.gat(x[b], edge_indices[b], rel_embed)
             outputs.append(out)
         return torch.stack(outputs, dim=0)
@@ -193,7 +195,7 @@ class ObjTokenProjector(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, use_roi_align=False, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=512, out_dim=512, use_roi_align=False, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
