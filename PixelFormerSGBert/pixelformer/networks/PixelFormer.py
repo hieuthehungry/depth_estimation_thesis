@@ -77,15 +77,22 @@ class BertRelationEncoder(nn.Module):
         # print(self.rel_tokens)
         self.rel_embeddings = self._encode_relations(self.rel_tokens)
 
+    def to(self, *args, **kwargs):
+        # Ensures the model moves correctly across devices
+        super().to(*args, **kwargs)
+        self.bert.to(*args, **kwargs)
+        return self
+
     def _encode_relations(self, rel_texts):
         with torch.no_grad():
             tokens = self.tokenizer(rel_texts, padding=True, return_tensors='pt')
             outputs = self.bert(**tokens)
             cls_embeddings = outputs.last_hidden_state[:, 0, :]  # CLS token
-            return self.linear(cls_embeddings)  # [num_rel, out_dim]
+        return self.linear(cls_embeddings)  # [num_rel, out_dim]
 
     def forward(self, rel_type_ids):
         # rel_type_ids: (num_edges,) integer tensor
+        rel_type_ids = rel_type_ids.to(self.rel_embeddings.device)
         return self.rel_embeddings[rel_type_ids]
 
 
@@ -249,6 +256,7 @@ class PixelFormerSG(nn.Module):
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim, rel_classes=REL_CLASSES)
+        print(self.sg_encoder.device)
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
