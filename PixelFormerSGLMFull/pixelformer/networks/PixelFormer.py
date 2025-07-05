@@ -146,6 +146,9 @@ class SharedTextEncoder(nn.Module):
             raise ValueError(f"Unsupported encoder type: {encoder_type}")
 
     def forward(self, token_ids):
+        if isinstance(token_ids, list):
+            token_ids = torch.tensor(token_ids, dtype=torch.long, device=self.linear[0].weight.device if isinstance(self.linear, nn.Sequential) else self.linear.weight.device)
+
         if self.encoder_type == 'clip':
             with torch.no_grad():
                 output = self.encoder(input_ids=self.input_ids, attention_mask=self.attention_mask)
