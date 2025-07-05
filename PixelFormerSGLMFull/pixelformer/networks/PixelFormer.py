@@ -201,8 +201,7 @@ class SceneGraphEncoder(nn.Module):
             # edge_types_b = edge_types_all[b]
             print("=============================")
             print(x.shape)
-            print(len(edge_indices_b))
-            print(rel_embed.shape)
+            print(edge_indices_b)
             print("=============================")
             rel_embed = self.embed_rel(edge_types_b)
             out = self.gat(x, edge_indices_b, rel_embed)
