@@ -31,6 +31,7 @@ def match_box_indices(boxes, reference_boxes, iou_threshold=0.9):
             raise ValueError(f"Expected reference_boxes of shape [N, 4], got {reference_boxes.shape}")
         ious = box_iou(b.unsqueeze(0), reference_boxes).squeeze(0)  # [N]
         max_iou, idx = ious.max(dim=0)
+        print(max_iou)
         matched_indices.append(idx if max_iou > iou_threshold else -1)
     return matched_indices
 
@@ -209,21 +210,20 @@ class SceneGraphEncoder(nn.Module):
 
 
             node_ids = torch.cat([sub_ids_b], dim=0)
+            print()
             x = self.embed_rel(node_ids)
-
-
 
             # edge_indices_b = edge_indices_all[b]
             # edge_types_b = edge_types_all[b]
             
-            rel_embed = self.embed_rel(edge_types)
+            rel_embed = self.embed_rel(edge_types[b])
             edge_idx = edge_indices[b]   
             print("=============================")
             print(x.shape)
             print(edge_indices)
             print("=============================")
 
-            out = self.gat(x, edge_idx, rel_embed)
+            out = self.gat(x[b], edge_idx, rel_embed)
             outputs.append(out)
 
         return torch.stack(outputs, dim=0)
