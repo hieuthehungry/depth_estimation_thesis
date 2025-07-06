@@ -81,6 +81,19 @@ from .obj_and_rel import REL_CLASSES, CLASSES
  
 
 class CLIPRelationEncoder(nn.Module):
+    """
+    Alternatives:
+
+    openai/clip-vit-large-patch14
+    laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+    roberta-base: user pooler_output
+    roberta-large: same as above
+    microsoft/deberta-v3-base
+    intfloat/e5-base-v2
+    facebook/contriever
+    BAAI/bge-small-en or bge-base-en
+    google/bge-m3 
+    """
     def __init__(self, rel_classes, model_name='openai/clip-vit-base-patch16', out_dim=256):
         super().__init__()
         self.tokenizer = CLIPTokenizer.from_pretrained(model_name)
@@ -176,18 +189,18 @@ class SceneGraphEncoder(nn.Module):
 
         outputs = []
         for b in range(B):
-            valid_mask = (sub_max_vals[b] >= 0.3) & (obj_max_vals[b] >= 0.3)
+            # valid_mask = (sub_max_vals[b] >= 0.3) & (obj_max_vals[b] >= 0.3)
 
-            if valid_mask.sum() == 0:
-                outputs.append(torch.zeros((1, self.embed_rel.out_dim), device=sub_logits.device))
-                continue
+            # if valid_mask.sum() == 0:
+            #     outputs.append(torch.zeros((1, self.embed_rel.out_dim), device=sub_logits.device))
+            #     continue
 
-            sub_ids_b = sub_ids[b][valid_mask] + CLS_OFFSET
-            obj_ids_b = obj_ids[b][valid_mask] + CLS_OFFSET
+            sub_ids_b = sub_ids[b] + CLS_OFFSET
+            obj_ids_b = obj_ids[b] + CLS_OFFSET
 
-            sub_boxes_b = sub_boxes[b][valid_mask]
-            obj_boxes_b = obj_boxes[b][valid_mask]
-            rel_logits_b = rel_logits[b][valid_mask]
+            sub_boxes_b = sub_boxes[b]
+            obj_boxes_b = obj_boxes[b]
+            rel_logits_b = rel_logits[b]
             pred_boxes_b = pred_boxes[b]  # unchanged for IoU matching
 
             node_ids = torch.cat([sub_ids_b, obj_ids_b], dim=0)
@@ -207,6 +220,9 @@ class SceneGraphEncoder(nn.Module):
             print(edge_indices_b)
             print("=============================")
             rel_embed = self.embed_rel(edge_types_b)
+            if edge_indices_b.shape[0] != 2:
+                edge_indices_b = edge_indices_b.t().contiguous()
+                edge_indices_b = edge_indices_b.long()
             out = self.gat(x, edge_indices_b, rel_embed)
             outputs.append(out)
 
