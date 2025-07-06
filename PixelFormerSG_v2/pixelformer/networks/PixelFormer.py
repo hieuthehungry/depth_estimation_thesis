@@ -72,6 +72,7 @@ class SceneGraphEncoder(nn.Module):
     def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
         B, N, C = pred_logits.shape
         x = pred_logits[:, :, :-1].softmax(dim=-1)
+        x = torch.argmax(x, dim=-1)
         x = self.embed_obj(x)  
         rel_logits = rel_logits[:, :, :-1]
         edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
