@@ -61,6 +61,10 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
         for idx in top_indices:
             si = sub_idxs[idx]
             oi = obj_idxs[idx]
+            print("hahaha")
+            print(si)
+            print(oi)
+            print("hahaha")
             if si >= 0 and oi >= 0:
                 edge_index.append([si, oi])
                 edge_type.append(pred_rel[idx].to(rel_logits.device))
@@ -211,13 +215,15 @@ class SceneGraphEncoder(nn.Module):
 
             # edge_indices_b = edge_indices_all[b]
             # edge_types_b = edge_types_all[b]
+            
+            rel_embed = self.embed_rel(edge_types)
+            edge_idx = edge_indices[b]   
             print("=============================")
             print(x.shape)
             print(edge_indices)
             print("=============================")
-            rel_embed = self.embed_rel(edge_types)
-            
-            out = self.gat(x, edge_indices, rel_embed)
+
+            out = self.gat(x, edge_idx, rel_embed)
             outputs.append(out)
 
         return torch.stack(outputs, dim=0)
