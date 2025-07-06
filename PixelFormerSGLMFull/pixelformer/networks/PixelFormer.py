@@ -186,7 +186,7 @@ class SceneGraphEncoder(nn.Module):
 
         sub_max_vals, sub_ids = sub_probs.max(dim=-1)
         obj_max_vals, obj_ids = obj_probs.max(dim=-1)
-        edge_indices_b, edge_types_b = extract_scene_graph_edges(
+        edge_indices, edge_types = extract_scene_graph_edges(
                 sub_boxes,
                 obj_boxes,
                 rel_logits,
@@ -204,7 +204,7 @@ class SceneGraphEncoder(nn.Module):
             obj_ids_b = obj_ids[b] + CLS_OFFSET
 
 
-            node_ids = torch.cat([sub_ids_b, obj_ids_b], dim=0)
+            node_ids = torch.cat([sub_ids_b], dim=0)
             x = self.embed_rel(node_ids)
 
 
@@ -213,9 +213,9 @@ class SceneGraphEncoder(nn.Module):
             # edge_types_b = edge_types_all[b]
             print("=============================")
             print(x.shape)
-            print(edge_indices_b)
+            print(edge_indices)
             print("=============================")
-            rel_embed = self.embed_rel(edge_types_b)
+            rel_embed = self.embed_rel(edge_types)
             
             out = self.gat(x, edge_indices_b, rel_embed)
             outputs.append(out)
