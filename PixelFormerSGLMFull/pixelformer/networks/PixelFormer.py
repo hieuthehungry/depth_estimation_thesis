@@ -217,7 +217,7 @@ class SceneGraphEncoder(nn.Module):
             print("=============================")
             rel_embed = self.embed_rel(edge_types)
             
-            out = self.gat(x, edge_indices_b, rel_embed)
+            out = self.gat(x, edge_indices, rel_embed)
             outputs.append(out)
 
         return torch.stack(outputs, dim=0)
