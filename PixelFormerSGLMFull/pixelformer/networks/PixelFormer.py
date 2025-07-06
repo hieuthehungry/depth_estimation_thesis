@@ -52,9 +52,9 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
         # Select top-k relations based on highest score
         top_scores, top_indices = torch.topk(max_scores, k=min(top_k, T))
         top_indices = top_indices.tolist()
-        print("Hehehe")
-        print(top_indices)
-        print()
+        # print("Hehehe")
+        # print(top_indices)
+        # print()
 
         sub_idxs = match_box_indices(sub_boxes[b], pred_boxes[b], iou_threshold)
         obj_idxs = match_box_indices(obj_boxes[b], pred_boxes[b], iou_threshold)
@@ -62,10 +62,10 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
         for idx in top_indices:
             si = sub_idxs[idx]
             oi = obj_idxs[idx]
-            print("hahaha")
-            print(si)
-            print(oi)
-            print("hahaha")
+            # print("hahaha")
+            # print(si)
+            # print(oi)
+            # print("hahaha")
             if si >= 0 and oi >= 0:
                 edge_index.append([si, oi])
                 edge_type.append(pred_rel[idx].to(rel_logits.device))
