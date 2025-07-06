@@ -5,20 +5,20 @@ import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-import os, sys, time
+import os, sys
 from telnetlib import IP
 import argparse
 import numpy as np
 from tqdm import tqdm
-
+from time import time
 from tensorboardX import SummaryWriter
 
 from utils import post_process_depth, flip_lr, silog_loss, compute_errors, eval_metrics, \
                        block_print, enable_print, normalize_result, inv_normalize, convert_arg_line_to_args
-from networks.PixelFormer import PixelFormer
+from networks.PixelFormer import PixelFormerSG
 
 
-parser = argparse.ArgumentParser(description='PixelFormer PyTorch implementation.', fromfile_prefix_chars='@')
+parser = argparse.ArgumentParser(description='PixelFormerSG PyTorch implementation.', fromfile_prefix_chars='@')
 parser.convert_arg_line_to_args = convert_arg_line_to_args
 
 parser.add_argument('--mode',                      type=str,   help='train or test', default='train')
@@ -80,6 +80,8 @@ parser.add_argument('--garg_crop',                             help='if set, cro
 parser.add_argument('--eval_freq',                 type=int,   help='Online evaluation frequency in global steps', default=500)
 parser.add_argument('--eval_summary_directory',    type=str,   help='output directory for eval summary,'
                                                                     'if empty outputs to checkpoint folder', default='')
+parser.add_argument('--sg_path',                   type=str,   help='path to the scene graph for training', required=False)
+parser.add_argument('--sg_path_eval',            type=str,   help='path to the scene graph for eval', required=False)
 
 if sys.argv.__len__() == 2:
     arg_filename_with_prefix = '@' + sys.argv[1]
@@ -93,26 +95,32 @@ elif args.dataset == 'kittipred':
     from dataloaders.dataloader_kittipred import NewDataLoader
 
 
-def online_eval(model, dataloader_eval, gpu, ngpus, post_process=True):
+def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
     eval_measures = torch.zeros(10).cuda(device=gpu)
+    timer = []
     for _, eval_sample_batched in enumerate(tqdm(dataloader_eval.data)):
+        # print(eval_sample_batched)
         with torch.no_grad():
             image = torch.autograd.Variable(eval_sample_batched['image'].cuda(gpu, non_blocking=True))
             gt_depth = eval_sample_batched['depth']
+            scene_graph = eval_sample_batched["scene_graph"]
+            scene_graph =  {key: scene_graph[key].cuda(gpu, non_blocking=True) for key in scene_graph.keys()}
             has_valid_depth = eval_sample_batched['has_valid_depth']
             if not has_valid_depth:
                 # print('Invalid depth. continue.')
                 continue
-
-            pred_depth = model(image)
+            start_time = time()
+            pred_depth = model(image, scene_graph = scene_graph
+                                        )
             if post_process:
                 image_flipped = flip_lr(image)
-                pred_depth_flipped = model(image_flipped)
+                pred_depth_flipped = model(image_flipped, scene_graph = scene_graph)
                 pred_depth = post_process_depth(pred_depth, pred_depth_flipped)
-
+            end_time = time()
+            timer.append(end_time - start_time)
             pred_depth = pred_depth.cpu().numpy().squeeze()
             gt_depth = gt_depth.cpu().numpy().squeeze()
-
+        
         if args.do_kb_crop:
             height, width = gt_depth.shape
             top_margin = int(height - 352)
@@ -181,7 +189,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.rank = args.rank * ngpus_per_node + gpu
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank)
 
-    model = PixelFormer(version=args.encoder, inv_depth=False, max_depth=args.max_depth, pretrained=args.pretrain)
+    model = PixelFormerSG(version=args.encoder, inv_depth=False, max_depth=args.max_depth, pretrained=args.pretrain)
     model.train()
 
     num_params = sum([np.prod(p.size()) for p in model.parameters()])
@@ -262,7 +270,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     silog_criterion = silog_loss(variance_focus=args.variance_focus)
 
-    start_time = time.time()
+    start_time = time()
     duration = 0
 
     num_log_images = args.batch_size
@@ -284,12 +292,15 @@ def main_worker(gpu, ngpus_per_node, args):
 
         for step, sample_batched in enumerate(dataloader.data):
             optimizer.zero_grad()
-            before_op_time = time.time()
+            before_op_time = time()
 
             image = torch.autograd.Variable(sample_batched['image'].cuda(args.gpu, non_blocking=True))
             depth_gt = torch.autograd.Variable(sample_batched['depth'].cuda(args.gpu, non_blocking=True))
 
-            depth_est = model(image)
+            scene_graph = sample_batched["scene_graph"]
+            scene_graph =  {key: scene_graph[key].cuda(gpu, non_blocking=True) for key in scene_graph.keys()}
+            depth_est = model(image, scene_graph = scene_graph
+                                        )
 
             if args.dataset == 'nyu':
                 mask = depth_gt > 0.1
@@ -310,14 +321,14 @@ def main_worker(gpu, ngpus_per_node, args):
                     print('NaN in loss occurred. Aborting training.')
                     return -1
 
-            duration += time.time() - before_op_time
+            duration += time() - before_op_time
             if global_step and global_step % args.log_freq == 0 and not model_just_loaded:
                 var_sum = [var.sum().item() for var in model.parameters() if var.requires_grad]
                 var_cnt = len(var_sum)
                 var_sum = np.sum(var_sum)
                 examples_per_sec = args.batch_size / duration * args.log_freq
                 duration = 0
-                time_sofar = (time.time() - start_time) / 3600
+                time_sofar = (time() - start_time) / 3600
                 training_time_left = (num_total_steps / global_step - 1.0) * time_sofar
                 if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     print("{}".format(args.model_name))
@@ -337,12 +348,12 @@ def main_worker(gpu, ngpus_per_node, args):
                     writer.flush()
 
             if args.do_online_eval and global_step and global_step % args.eval_freq == 0 and not model_just_loaded:
-                time.sleep(0.1)
+                # time.sleep(0.1)
                 model.eval()
                 with torch.no_grad():
                     eval_measures = online_eval(model, dataloader_eval, gpu, ngpus_per_node, post_process=False)
                 if eval_measures is not None:
-                    for i in range(9):
+                    for i in range(1):
                         eval_summary_writer.add_scalar(eval_metrics[i], eval_measures[i].cpu(), int(global_step))
                         measure = eval_measures[i]
                         is_best = False
@@ -391,12 +402,13 @@ def main():
         print('train.py is only for training.')
         return -1
 
-    command = 'mkdir ' + os.path.join(args.log_directory, args.model_name)
-    os.system(command)
+    # command = 'mkdir ' + os.path.join(args.log_directory, args.model_name)
+    # os.system(command)
+    os.makedirs(os.path.join(args.log_directory, args.model_name), exist_ok= True)
 
     args_out_path = os.path.join(args.log_directory, args.model_name)
     command = 'cp ' + sys.argv[1] + ' ' + args_out_path
-    os.system(command)
+    # os.system(command)
 
     save_files = True
     if save_files:

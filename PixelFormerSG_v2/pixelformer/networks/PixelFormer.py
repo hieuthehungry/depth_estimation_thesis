@@ -34,33 +34,25 @@ def match_box_indices(boxes, reference_boxes, iou_threshold=0.9):
         matched_indices.append(idx if max_iou > iou_threshold else -1)
     return matched_indices
 
-def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.9, top_k = 8):
+def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.9):
     edge_index_list = []
     edge_type_list = []
     B, T, R = rel_logits.shape
     for b in range(B):
         edge_index = []
         edge_type = []
-        
-        rel_probs = F.softmax(rel_logits[b, :, :-1], dim=-1)  # [T, R-1]
-        max_scores, pred_rel = torch.max(rel_probs, dim=-1)   # [T]
-
-        # Select top-k relations based on highest score
-        top_scores, top_indices = torch.topk(max_scores, k=min(top_k, T))
-        top_indices = top_indices.tolist()
-        # rel_probs = F.softmax(rel_logits[b], dim=-1)[:, :, :-1]
-        # pred_rel = torch.argmax(rel_probs, dim=-1)
-        # pred_rel = pred_rel.clamp(max=len(REL_CLASSES) - 1)
+        rel_probs = F.softmax(rel_logits[b], dim=-1)
+        pred_rel = torch.argmax(rel_probs, dim=-1)
 
         sub_idxs = match_box_indices(sub_boxes[b], pred_boxes[b], iou_threshold)
         obj_idxs = match_box_indices(obj_boxes[b], pred_boxes[b], iou_threshold)
 
-        for idx in top_indices:
-            si = sub_idxs[idx]
-            oi = obj_idxs[idx]
+        for t in range(T):
+            si = sub_idxs[t]
+            oi = obj_idxs[t]
             if si >= 0 and oi >= 0:
                 edge_index.append([si, oi])
-                edge_type.append(pred_rel[idx].to(rel_logits.device))
+                edge_type.append(pred_rel[t])
         if len(edge_index) == 0:  # avoid crash
             edge_index = [[0, 0]]
             edge_type = [torch.tensor(0, device=rel_logits.device)]
@@ -70,108 +62,32 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
         edge_type_list.append(edge_type)
     return edge_index_list, edge_type_list
 
-from transformers import BertTokenizer, BertModel, CLIPTokenizer, CLIPTextModel
-import torch.nn as nn
-import torch
-from .obj_and_rel import REL_CLASSES 
- 
-
-class CLIPRelationEncoder(nn.Module):
-    def __init__(self, rel_classes, model_name='openai/clip-vit-base-patch16', out_dim=256):
-        super().__init__()
-        self.tokenizer = CLIPTokenizer.from_pretrained(model_name)
-        self.text_encoder = CLIPTextModel.from_pretrained(model_name)
-        for p in self.text_encoder.parameters():
-            p.requires_grad = False  # freeze encoder
-        
-        self.linear = nn.Sequential(
-            nn.Linear(self.text_encoder.config.hidden_size, out_dim),
-            nn.GELU(),
-        )
-
-        self.texts = rel_classes
-        tokens = self.tokenizer(self.texts, padding=True, return_tensors='pt')
-        self.register_buffer("input_ids", tokens["input_ids"])
-        self.register_buffer("attention_mask", tokens["attention_mask"])
-
-    def forward(self, rel_type_ids):
-        with torch.no_grad():
-            output = self.text_encoder(input_ids=self.input_ids, attention_mask=self.attention_mask)
-        cls_embed = output.last_hidden_state[:, 0, :]  # [num_rels, hidden]
-        rel_emb = self.linear(cls_embed)
-        return rel_emb[rel_type_ids.to(rel_emb.device)]
-
-
-
-class BertRelationEncoder(nn.Module):
-    def __init__(self, rel_classes: list, pretrained_model='bert-base-uncased', out_dim=256):
-        super().__init__()
-        self.tokenizer = BertTokenizer.from_pretrained(pretrained_model)
-        self.bert = BertModel.from_pretrained(pretrained_model)
-        self.linear = nn.Sequential(
-            nn.Linear(self.text_encoder.config.hidden_size, out_dim),
-            nn.GELU(),
-        )
-        self.rel_tokens = rel_classes
-
-        # Freeze BERT, but keep linear trainable
-        for param in self.bert.parameters():
-            param.requires_grad = False
-
-        # Tokenize once (still needed each forward)
-        tokens = self.tokenizer(rel_classes, padding=True, return_tensors='pt')
-        self.register_buffer('input_ids', tokens['input_ids'])
-        self.register_buffer('attention_mask', tokens['attention_mask'])
-
-    def forward(self, rel_type_ids):
-        with torch.no_grad():
-            outputs = self.bert(
-                input_ids=self.input_ids,
-                attention_mask= self.attention_mask
-            )
-        cls_embed = outputs.last_hidden_state[:, 0, :]  # [num_rel, hidden]
-        rel_emb = self.linear(cls_embed)                # [num_rel, out_dim]
-        return rel_emb[rel_type_ids.to(rel_emb.device)] # [num_edges, out_dim]
-
-
-
 class SceneGraphEncoder(nn.Module):
-        def __init__(self, node_dim, out_dim, rel_classes=REL_CLASSES, rel_encoder = "clip"):
-            super().__init__()
-            if rel_encoder == "bert":
-                self.embed_rel = BertRelationEncoder(rel_classes, out_dim=out_dim)
-            elif rel_encoder == "clip":
-                self.embed_rel = CLIPRelationEncoder(rel_classes, out_dim=out_dim)
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            self.embed_rel.to(device)
-            self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
-            self.node_proj = nn.Linear(152, node_dim)  # Project pred_logits to node_dim
+    def __init__(self, node_dim, out_dim, rel_classes=52):
+        super().__init__()
+        self.embed_rel = nn.Embedding(rel_classes, node_dim)
+        self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
 
-        def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
-            B, N, C = pred_logits.shape
-            x = pred_logits.softmax(dim=-1)
-            x = self.node_proj(x)  
-            edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
+    def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
+        B, N, C = pred_logits.shape
+        x = pred_logits.softmax(dim=-1)
+        edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
 
-            outputs = []
-            # print(self.embed_rel.num_embeddings)
-            for b in range(B):
-                num_rels = self.embed_rel.input_ids.size(0)  # Get number of relation types
-                assert torch.all((edge_types[b] >= 0) & (edge_types[b] <= num_rels)), f"Invalid rel class ID: {edge_types[b]}"
-                device = x[b].device
-                self.embed_rel.to(x.device)
-                rel_embed = self.embed_rel(edge_types[b].to(device))  # <- explicitly align device
-                edge_idx = edge_indices[b].to(device)            
+        outputs = []
+        # print(self.embed_rel.num_embeddings)
+        for b in range(B):
+            
+            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.num_embeddings)), f"Invalid rel class ID: {edge_types[b]}"
+            rel_embed = self.embed_rel(edge_types[b])
+            # print("============================")
+            # print(x[b].shape)
+            # print(edge_indices[b].shape)
+            # print(rel_embed.shape)
+            # print("============================")
+            out = self.gat(x[b], edge_indices[b], rel_embed)
+            outputs.append(out)
+        return torch.stack(outputs, dim=0)
 
-                # print("============================")
-                # print(x[b].device)
-                # print(edge_idx.device)
-                # print(rel_embed.device)
-                # print("============================")
-                out = self.gat(x[b], edge_idx, rel_embed)
-                outputs.append(out)
-            return torch.stack(outputs, dim=0)
-                                                                                                                                                        
 
 
 
@@ -237,7 +153,7 @@ class ObjTokenProjector(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=512, out_dim=512, use_roi_align=False, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, rel_classes=52, use_roi_align=False, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
@@ -305,8 +221,7 @@ class PixelFormerSG(nn.Module):
         self.disp_head1 = DispHead(input_dim=sam_dims[0])
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
-        self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim, rel_classes=REL_CLASSES)
-        # print(self.sg_encoder.device)
+        self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim, rel_classes=rel_classes)
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
