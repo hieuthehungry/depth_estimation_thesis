@@ -31,11 +31,11 @@ def match_box_indices(boxes, reference_boxes, iou_threshold=0.9):
             raise ValueError(f"Expected reference_boxes of shape [N, 4], got {reference_boxes.shape}")
         ious = box_iou(b.unsqueeze(0), reference_boxes).squeeze(0)  # [N]
         max_iou, idx = ious.max(dim=0)
-        print(max_iou)
+        # print(max_iou)
         matched_indices.append(idx if max_iou > iou_threshold else -1)
     return matched_indices
 
-def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.9, top_k = 8):
+def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.6, top_k = 8):
     edge_index_list = []
     edge_type_list = []
     B = rel_logits.size(0)
@@ -219,7 +219,7 @@ class SceneGraphEncoder(nn.Module):
             rel_embed = self.embed_rel(edge_types[b])
             edge_idx = edge_indices[b]   
             print("=============================")
-            print(x.shape)
+            print(x[b].shape)
             print(edge_indices)
             print("=============================")
 
