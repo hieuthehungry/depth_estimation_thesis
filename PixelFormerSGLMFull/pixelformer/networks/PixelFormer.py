@@ -210,11 +210,8 @@ class SceneGraphEncoder(nn.Module):
 
 
             node_ids = torch.cat([sub_ids_b], dim=0)
-            print()
+            print(node_ids.shape)
             x = self.embed_rel(node_ids)
-
-            # edge_indices_b = edge_indices_all[b]
-            # edge_types_b = edge_types_all[b]
             
             rel_embed = self.embed_rel(edge_types[b])
             edge_idx = edge_indices[b]   
