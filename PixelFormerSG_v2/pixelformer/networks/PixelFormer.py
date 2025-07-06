@@ -34,7 +34,7 @@ def match_box_indices(boxes, reference_boxes, iou_threshold=0.9):
         matched_indices.append(idx if max_iou > iou_threshold else -1)
     return matched_indices
 
-def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.9):
+def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_threshold=0.6):
     edge_index_list = []
     edge_type_list = []
     B, T, R = rel_logits.shape
@@ -63,14 +63,17 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
     return edge_index_list, edge_type_list
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, node_dim, out_dim, rel_classes=52):
+    def __init__(self, node_dim, out_dim, rel_classes=51, obj_classes = 151):
         super().__init__()
         self.embed_rel = nn.Embedding(rel_classes, node_dim)
+        self.embed_obj = nn.Embedding(obj_classes, node_dim)
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
 
     def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
         B, N, C = pred_logits.shape
-        x = pred_logits.softmax(dim=-1)
+        x = pred_logits[:, :, :-1].softmax(dim=-1)
+        x = self.embed_obj(x)  
+        rel_logits = rel_logits[:, :, :-1]
         edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
 
         outputs = []
@@ -80,8 +83,8 @@ class SceneGraphEncoder(nn.Module):
             assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.num_embeddings)), f"Invalid rel class ID: {edge_types[b]}"
             rel_embed = self.embed_rel(edge_types[b])
             # print("============================")
-            # print(x[b].shape)
-            # print(edge_indices[b].shape)
+            # print(x[b])
+            # print(edge_indices[b])
             # print(rel_embed.shape)
             # print("============================")
             out = self.gat(x[b], edge_indices[b], rel_embed)
@@ -153,7 +156,7 @@ class ObjTokenProjector(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=152, out_dim=512, rel_classes=52, use_roi_align=False, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=512, out_dim=512, rel_classes=52, use_roi_align=False, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
