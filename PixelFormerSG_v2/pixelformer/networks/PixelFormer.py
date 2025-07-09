@@ -110,6 +110,7 @@ class SceneGraphEncoder(nn.Module):
             pooled_nodes = roi_align(feat_map, rois, output_size=self.roi_size,
                                      spatial_scale=scale, aligned=True)
             pooled_nodes = pooled_nodes.mean(dim=[2, 3])  # [N_obj, C]
+            print(pooled_nodes.shape)
             node_feats = self.node_proj(pooled_nodes)     # [N_obj, D]
             node_feat_list.append(node_feats)
 
