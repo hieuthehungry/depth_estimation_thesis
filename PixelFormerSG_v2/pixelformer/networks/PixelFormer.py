@@ -85,7 +85,7 @@ class SceneGraphEncoder(nn.Module):
             rel_logits: [B, N_rel, R]
             image_shapes: list of (H, W)
         """
-        feat_map = enc_feats[-1]  # [B, C, h, w]
+        feat_map = enc_feats  # [B, C, h, w]
         B, C, h, w = feat_map.shape
         device = feat_map.device
         node_feat_list, edge_index_list, edge_attr_list = [], [], []
@@ -374,7 +374,7 @@ class PixelFormerSG(nn.Module):
             B, _, H, W = imgs.shape
             image_shapes = [(H, W)] * B
             sg_feat = self.sg_encoder(
-                enc_feats, 
+                enc_feats[3], 
                 scene_graph['pred_boxes'],
                 scene_graph['sub_boxes'], 
                 scene_graph['obj_boxes'], 
