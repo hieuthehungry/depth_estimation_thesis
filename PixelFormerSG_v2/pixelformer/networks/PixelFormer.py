@@ -275,7 +275,7 @@ class PixelFormerSG(nn.Module):
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         self.sg_encoder_q4 = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
-        self.cross_attn_q4 = CrossAttnBlock(dim=512, num_heads=8)
+        self.cross_attn_q4 = CrossAttnBlock(dim=v_dims[3], num_heads=8)
 
         self.init_weights(pretrained=pretrained)
 
