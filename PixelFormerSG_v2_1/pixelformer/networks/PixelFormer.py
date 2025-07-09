@@ -207,7 +207,7 @@ class CrossAttnBlock(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, combine_option = "plus", **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, combine_option = "cross-attn", **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
