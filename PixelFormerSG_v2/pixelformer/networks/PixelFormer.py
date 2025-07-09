@@ -203,44 +203,24 @@ class BCP(nn.Module):
         centers = centers.contiguous().view(n, dout, 1, 1)
         return centers
 
-class ObjTokenProjector(nn.Module):
-    def __init__(self, num_tokens, token_dim=256, embed_dim=512):
-        super().__init__()
-        self.proj = nn.Sequential(
-            nn.Linear(token_dim, embed_dim),
-            nn.GELU(),
-        )
-    def forward(self, obj_tokens):
-        # obj_tokens: [B, num_tokens, token_dim]
-        return self.proj(obj_tokens)  # [B, num_tokens, embed_dim]
-
-
 import torch
 import torch.nn.functional as F
 from torchvision.ops import roi_align
 
-class ObjTokenProjector(nn.Module):
-    def __init__(self, num_tokens, token_dim=256, embed_dim=512):
-        super().__init__()
-        self.proj = nn.Sequential(
-            nn.Linear(token_dim, embed_dim),
-            nn.GELU(),
-        )
-    def forward(self, obj_tokens):
-        # obj_tokens: [B, num_tokens, token_dim]
-        return self.proj(obj_tokens)  # [B, num_tokens, embed_dim]
+
+
+
 
 
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=512, out_dim=512, rel_classes=52, use_roi_align=False, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=512, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
         self.with_auxiliary_head = False
         self.with_neck = False
-        self.use_roi_align=use_roi_align
 
         norm_cfg = dict(type='BN', requires_grad=True)
         # norm_cfg = dict(type='GN', requires_grad=True, num_groups=8)
@@ -276,7 +256,6 @@ class PixelFormerSG(nn.Module):
         )
 
         embed_dim = 512
-        self.obj_projector = ObjTokenProjector(num_tokens = 100, token_dim=in_channels[-1], embed_dim=embed_dim)
         decoder_cfg = dict(
             in_channels=in_channels,
             in_index=[0, 1, 2, 3],
@@ -302,7 +281,7 @@ class PixelFormerSG(nn.Module):
         self.disp_head1 = DispHead(input_dim=sam_dims[0])
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
-        self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=out_dim)
+        self.sg_encoder = SceneGraphEncoder(node_dim=node_dim, out_dim=in_channels[-3])
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
@@ -321,44 +300,6 @@ class PixelFormerSG(nn.Module):
                     aux_head.init_weights()
             else:
                 self.auxiliary_head.init_weights()
-    
-    def build_obj_tokens(self, imgs, enc_feats, obj_logits, obj_boxes, top_k=8, output_size=(7,7)):
-        B, num_queries, num_classes = obj_logits.shape
-        device = obj_logits.device
-        H, W = imgs.shape[-2:]
-        obj_embeddings = []
-        for b in range(B):
-            # Get top-k indices by max object class score
-            probs = F.softmax(obj_logits[b, :, :-1], dim=-1).max(dim=-1).values
-            vals, inds = torch.topk(probs, k=top_k, dim=0)
-
-            # Convert normalized boxes to pixel coords
-            cx, cy, w, h = obj_boxes[b, inds].unbind(dim=1)
-            x1 = (cx - w/2) * W
-            y1 = (cy - h/2) * H
-            x2 = (cx + w/2) * W
-            y2 = (cy + h/2) * H
-            rois = torch.stack([x1, y1, x2, y2], dim=1)
-
-            # Prepend image index
-            img_inds = torch.full((rois.size(0), 1), b, device=device, dtype=torch.float32)
-            rois_full = torch.cat([img_inds, rois], dim=1)
-
-            # ROI Align
-            scale = enc_feats[-1].size(-1) / float(H)
-            pooled = roi_align(
-                enc_feats[-1], rois_full, output_size=output_size,
-                spatial_scale=scale, aligned=True
-            )  # [top_k, C, output_size[0], output_size[1]]
-
-            # Average spatial dims
-            pooled_mean = pooled.mean(dim=[2, 3])  # [top_k, C]
-
-            # Project to token space
-            projected = self.obj_projector(pooled_mean)  # [top_k, D_proj]
-            obj_embeddings.append(projected)
-
-        return torch.stack(obj_embeddings, dim=0)  # [B, top_k, D_proj]
     
     def forward(self, imgs, scene_graph):
 
