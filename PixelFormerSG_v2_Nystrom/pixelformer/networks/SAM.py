@@ -205,7 +205,7 @@ class SAM(nn.Module):
 
         self.proj_e = nn.Conv2d(input_dim, embed_dim, kernel_size=1) if input_dim != embed_dim else nn.Identity()
         self.proj_q = nn.Conv2d(v_dim, embed_dim, kernel_size=1) if v_dim != embed_dim else nn.Identity()
-        self.proj_v = nn.Conv2d(v_dim, v_dim, kernel_size=1)  # ensure input v is well formed
+        self.proj_v = nn.Conv2d(input_dim, v_dim, kernel_size=1)  # ensure input v is well formed
 
         self.sam_block = SAMBLOCK(
             dim=embed_dim,
