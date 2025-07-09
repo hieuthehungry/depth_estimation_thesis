@@ -324,6 +324,7 @@ class PixelFormerSG(nn.Module):
                 image_shapes
             )
             sg_feat = sg_feat.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            print(q4.shape)
             q4 = q4 + sg_feat
 
         q3 = self.sam4(enc_feats[3], q4)
