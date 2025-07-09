@@ -265,10 +265,10 @@ class PixelFormerSG(nn.Module):
         win = 7
         sam_dims = [128, 256, 512, 1024]
         v_dims = [64, 128, 256, embed_dim]
-        self.sam4 = SAM(input_dim=in_channels[3], embed_dim=sam_dims[3], window_size=win, v_dim=v_dims[3], num_heads=32)
-        self.sam3 = SAM(input_dim=in_channels[2], embed_dim=sam_dims[2], window_size=win, v_dim=v_dims[2], num_heads=16)
-        self.sam2 = SAM(input_dim=in_channels[1], embed_dim=sam_dims[1], window_size=win, v_dim=v_dims[1], num_heads=8)
-        self.sam1 = SAM(input_dim=in_channels[0], embed_dim=sam_dims[0], window_size=win, v_dim=v_dims[0], num_heads=4)
+        self.sam4 = SAM(input_dim=in_channels[3], embed_dim=sam_dims[3], v_dim=v_dims[3], num_landmarks= 32, num_heads=32)
+        self.sam3 = SAM(input_dim=in_channels[2], embed_dim=sam_dims[2], v_dim=v_dims[2], num_landmarks= 64, num_heads=16)
+        self.sam2 = SAM(input_dim=in_channels[1], embed_dim=sam_dims[1], v_dim=v_dims[1], num_landmarks= 128, num_heads=8)
+        self.sam1 = SAM(input_dim=in_channels[0], embed_dim=sam_dims[0], v_dim=v_dims[0], num_landmarks= 256, num_heads=4)
 
         self.decoder = PSP(**decoder_cfg)
         self.disp_head1 = DispHead(input_dim=sam_dims[0])

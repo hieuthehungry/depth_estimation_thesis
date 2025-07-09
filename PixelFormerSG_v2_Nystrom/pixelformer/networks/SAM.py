@@ -145,56 +145,87 @@ class WindowAttention(nn.Module):
         return x
 
 class SAMBLOCK(nn.Module):
-    def __init__(self, dim, num_heads, num_landmarks=64, mlp_ratio=4., drop=0., drop_path=0., norm_layer=nn.LayerNorm):
+    def __init__(
+        self,
+        dim,                # embed_dim for input x
+        v_dim,              # v_dim for external feature v
+        num_heads=4,
+        num_landmarks=64,
+        mlp_ratio=4.0,
+        drop=0.0,
+        attn_drop=0.0,
+        drop_path=0.0,
+        norm_layer=nn.LayerNorm,
+    ):
         super().__init__()
-        self.norm1 = norm_layer(dim)
+        self.norm_q = norm_layer(dim)
+        self.norm_kv = norm_layer(v_dim)
+
         self.attn = NystromAttention(
             dim=dim,
             dim_head=dim // num_heads,
             heads=num_heads,
             num_landmarks=num_landmarks,
-            pinv_iterations=6,
-            residual=True
+            kv_dim=v_dim,
+            attn_dropout=attn_drop,
+            dropout=drop
         )
-        self.drop_path = nn.Identity() if drop_path == 0. else nn.Dropout(drop_path)
-        self.norm2 = norm_layer(dim)
+
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.norm_out = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, drop=drop)
 
-    def forward(self, x):
-        shortcut = x
-        x = self.norm1(x)
-        x = self.attn(x)
-        x = self.drop_path(x) + shortcut
-        x = x + self.drop_path(self.mlp(self.norm2(x)))
+    def forward(self, x, v):
+        # x: (B, N, dim), v: (B, N, v_dim)
+        x_norm = self.norm_q(x)
+        v_norm = self.norm_kv(v)
+
+        attn_out = self.attn(x_norm, v_norm)  # Cross-attention
+        x = x + self.drop_path(attn_out)
+        x = x + self.drop_path(self.mlp(self.norm_out(x)))
         return x
 
 
 class SAM(nn.Module):
-    def __init__(self, input_dim=96, embed_dim=96, num_heads=4, num_landmarks=64):
+    def __init__(
+        self,
+        input_dim=96,
+        embed_dim=96,
+        v_dim=64,
+        num_heads=4,
+        num_landmarks=64,
+        norm_layer=nn.LayerNorm
+    ):
         super().__init__()
         self.embed_dim = embed_dim
+        self.v_dim = v_dim
 
-        if input_dim != embed_dim:
-            self.proj_e = nn.Conv2d(input_dim, embed_dim, kernel_size=1)
-        else:
-            self.proj_e = nn.Identity()
+        self.proj_e = nn.Conv2d(input_dim, embed_dim, kernel_size=1) if input_dim != embed_dim else nn.Identity()
+        self.proj_q = nn.Conv2d(v_dim, embed_dim, kernel_size=1) if v_dim != embed_dim else nn.Identity()
+        self.proj_v = nn.Conv2d(v_dim, v_dim, kernel_size=1)  # ensure input v is well formed
 
         self.sam_block = SAMBLOCK(
             dim=embed_dim,
+            v_dim=v_dim,
             num_heads=num_heads,
             num_landmarks=num_landmarks
         )
-        self.norm = nn.LayerNorm(embed_dim)
+        self.norm = norm_layer(embed_dim)
 
     def forward(self, e, q):
-        B, C, H, W = e.shape
-        e = self.proj_e(e)
-        q = self.proj_e(q)
+        # e: feature map from encoder, q: external guidance (e.g., scene graph)
+        B, _, H, W = e.shape
 
-        x = e + q
-        x = x.flatten(2).transpose(1, 2)  # (B, H*W, C)
-        x = self.sam_block(x)
+        e = self.proj_e(e)     # (B, embed_dim, H, W)
+        q = self.proj_q(q)     # (B, embed_dim, H, W)
+        v = self.proj_v(q)     # (B, v_dim, H, W)
+
+        x = e + q              # fused guidance
+        x = x.flatten(2).transpose(1, 2)  # (B, N, embed_dim)
+        v = v.flatten(2).transpose(1, 2)  # (B, N, v_dim)
+
+        x = self.sam_block(x, v)
         x = self.norm(x)
         x = x.transpose(1, 2).view(B, self.embed_dim, H, W)
         return x + e + q
