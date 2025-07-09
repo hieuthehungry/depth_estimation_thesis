@@ -63,36 +63,113 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
     return edge_index_list, edge_type_list
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, node_dim, out_dim, rel_classes=51, obj_classes = 151):
+    def __init__(self, node_dim, out_dim, edge_dim=None, roi_size=(7, 7)):
         super().__init__()
-        self.embed_rel = nn.Embedding(rel_classes, node_dim)
-        self.embed_obj = nn.Embedding(obj_classes, node_dim)
+        self.roi_size = roi_size
+        self.node_proj = nn.Sequential(
+            nn.Linear(node_dim, node_dim),
+            nn.GELU()
+        )
+        self.edge_proj = nn.Sequential(
+            nn.Linear(2 * node_dim, node_dim),  # Concatenated sub + obj features
+            nn.GELU()
+        )
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
 
-    def forward(self, pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes):
-        B, N, C = pred_logits.shape
-        x = pred_logits[:, :, :-1].softmax(dim=-1)
-        x = torch.argmax(x, dim=-1)
-        x = self.embed_obj(x)  
-        rel_logits = rel_logits[:, :, :-1]
-        edge_indices, edge_types = extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes)
+    def forward(self, enc_feats, pred_boxes, sub_boxes, obj_boxes, rel_logits, image_shapes):
+        """
+        Args:
+            enc_feats: list of encoder feature maps (use enc_feats[-1])
+            pred_boxes: [B, N_obj, 4] in normalized cxcywh
+            sub_boxes, obj_boxes: [B, N_rel, 4] in normalized cxcywh
+            rel_logits: [B, N_rel, R]
+            image_shapes: list of (H, W)
+        """
+        feat_map = enc_feats[-1]  # [B, C, h, w]
+        B, C, h, w = feat_map.shape
+        device = feat_map.device
+        node_feat_list, edge_index_list, edge_attr_list = [], [], []
+
+        for b in range(B):
+            H, W = image_shapes[b]
+            scale = w / float(W)
+
+            ### Node Feature Extraction (RoIAlign on pred_boxes)
+            cx, cy, bw, bh = pred_boxes[b].unbind(-1)
+            x1 = (cx - bw / 2) * W
+            y1 = (cy - bh / 2) * H
+            x2 = (cx + bw / 2) * W
+            y2 = (cy + bh / 2) * H
+            boxes = torch.stack([x1, y1, x2, y2], dim=-1)
+
+            rois = torch.cat([
+                torch.full((boxes.size(0), 1), b, dtype=torch.float32, device=device),
+                boxes
+            ], dim=-1)
+
+            pooled_nodes = roi_align(feat_map, rois, output_size=self.roi_size,
+                                     spatial_scale=scale, aligned=True)
+            pooled_nodes = pooled_nodes.mean(dim=[2, 3])  # [N_obj, C]
+            node_feats = self.node_proj(pooled_nodes)     # [N_obj, D]
+            node_feat_list.append(node_feats)
+
+            ### Edge Feature Extraction
+            rel_probs = F.softmax(rel_logits[b], dim=-1)
+            pred_rels = torch.argmax(rel_probs, dim=-1)  # Optional, only if class is used
+
+            # Match sub/obj boxes to pred_boxes for indexing
+            sub_idxs = match_box_indices(sub_boxes[b], pred_boxes[b])
+            obj_idxs = match_box_indices(obj_boxes[b], pred_boxes[b])
+
+            sub_cx, sub_cy, sub_w, sub_h = sub_boxes[b].unbind(-1)
+            sub_x1 = (sub_cx - sub_w / 2) * W
+            sub_y1 = (sub_cy - sub_h / 2) * H
+            sub_x2 = (sub_cx + sub_w / 2) * W
+            sub_y2 = (sub_cy + sub_h / 2) * H
+            sub_roi = torch.stack([sub_x1, sub_y1, sub_x2, sub_y2], dim=-1)
+
+            obj_cx, obj_cy, obj_w, obj_h = obj_boxes[b].unbind(-1)
+            obj_x1 = (obj_cx - obj_w / 2) * W
+            obj_y1 = (obj_cy - obj_h / 2) * H
+            obj_x2 = (obj_cx + obj_w / 2) * W
+            obj_y2 = (obj_cy + obj_h / 2) * H
+            obj_roi = torch.stack([obj_x1, obj_y1, obj_x2, obj_y2], dim=-1)
+
+            sub_roi_full = torch.cat([
+                torch.full((sub_roi.size(0), 1), b, dtype=torch.float32, device=device),
+                sub_roi
+            ], dim=-1)
+            obj_roi_full = torch.cat([
+                torch.full((obj_roi.size(0), 1), b, dtype=torch.float32, device=device),
+                obj_roi
+            ], dim=-1)
+
+            sub_feats = roi_align(feat_map, sub_roi_full, output_size=self.roi_size,
+                                  spatial_scale=scale, aligned=True).mean(dim=[2, 3])  # [T, C]
+            obj_feats = roi_align(feat_map, obj_roi_full, output_size=self.roi_size,
+                                  spatial_scale=scale, aligned=True).mean(dim=[2, 3])  # [T, C]
+
+            edge_feats = torch.cat([sub_feats, obj_feats], dim=-1)  # [T, 2C]
+            edge_feats = self.edge_proj(edge_feats)  # [T, D]
+
+            edge_list = []
+            for i, (s, o) in enumerate(zip(sub_idxs, obj_idxs)):
+                if s >= 0 and o >= 0:
+                    edge_list.append((s, o))
+
+            if not edge_list:
+                edge_list = [(0, 0)]
+                edge_feats = edge_feats.new_zeros(1, edge_feats.shape[1])
+
+            edge_index = torch.tensor(edge_list, device=device).T  # [2, E]
+            edge_index_list.append(edge_index)
+            edge_attr_list.append(edge_feats)
 
         outputs = []
-        # print(self.embed_rel.num_embeddings)
         for b in range(B):
-            
-            assert torch.all((edge_types[b] >= 0) & (edge_types[b] < self.embed_rel.num_embeddings)), f"Invalid rel class ID: {edge_types[b]}"
-            rel_embed = self.embed_rel(edge_types[b])
-            # print("============================")
-            # print(x[b])
-            # print(edge_indices[b])
-            # print(rel_embed.shape)
-            # print("============================")
-            out = self.gat(x[b], edge_indices[b], rel_embed)
+            out = self.gat(node_feat_list[b], edge_index_list[b], edge_attr_list[b])
             outputs.append(out)
-        return torch.stack(outputs, dim=0)
-
-
+        return torch.stack(outputs, dim=0)  # [B, N_obj, D]
 
 
 class BCP(nn.Module):
@@ -292,21 +369,20 @@ class PixelFormerSG(nn.Module):
         q4 = self.decoder(enc_feats)
 
         # NEW: condition q4 with object tokens
-        # 2. Conditionally incorporate object tokens
-
-        if self.use_roi_align and 'obj_logits' in scene_graph and 'obj_boxes' in scene_graph:
-            obj_tokens = self.build_obj_tokens(imgs, enc_feats, scene_graph['obj_logits'], scene_graph['obj_boxes'],
-                                                p_k=8, output_size=(7,7))  # [B, top_k, D_proj]
-            obj_mean = obj_tokens.mean(dim=1)[:, :, None, None]  # [B, D_proj, 1, 1]
-            q4 = q4 + obj_mean
-
-        elif not self.use_roi_align and all(k in scene_graph for k in ['pred_logits', 'rel_logits', 'sub_boxes', 'obj_boxes', 'pred_boxes']):
-            """pred_logits, rel_logits, sub_boxes, obj_boxes, pred_boxes"""
-            sg_global = self.sg_encoder(scene_graph['pred_logits'], scene_graph['rel_logits'],
-                                        scene_graph['sub_boxes'], scene_graph['obj_boxes'],
-                                        scene_graph['pred_boxes'])
-            sg_global = sg_global.mean(dim=1).unsqueeze(-1).unsqueeze(-1)
-            q4 = q4 + sg_global
+        # 2. Incorporate object tokens
+        if all(k in scene_graph for k in ['pred_boxes', 'sub_boxes', 'obj_boxes', 'rel_logits']):
+            B, _, H, W = imgs.shape
+            image_shapes = [(H, W)] * B
+            sg_feat = self.sg_encoder(
+                enc_feats, 
+                scene_graph['pred_boxes'],
+                scene_graph['sub_boxes'], 
+                scene_graph['obj_boxes'], 
+                scene_graph['rel_logits'],
+                image_shapes
+            )
+            sg_feat = sg_feat.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            q4 = q4 + sg_feat
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
