@@ -277,15 +277,15 @@ class PixelFormerSG(nn.Module):
         
         # scene graph encoder
         self.sg_encoder_q4 = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
-        self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
-        self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
-        self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
+        # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
+        # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
+        # self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
         
         # cross attention blocks
-        self.cross_attn_q4 = CrossAttnBlock(dim=v_dims[3], num_heads=8)
-        self.cross_attn_q3 = CrossAttnBlock(dim=v_dims[2], num_heads=8)
-        self.cross_attn_q2 = CrossAttnBlock(dim=v_dims[1], num_heads=4)
-        self.cross_attn_q1 = CrossAttnBlock(dim=v_dims[0], num_heads=4)
+        # self.cross_attn_q4 = CrossAttnBlock(dim=v_dims[3], num_heads=8)
+        # self.cross_attn_q3 = CrossAttnBlock(dim=v_dims[2], num_heads=8)
+        # self.cross_attn_q2 = CrossAttnBlock(dim=v_dims[1], num_heads=4)
+        # self.cross_attn_q1 = CrossAttnBlock(dim=v_dims[0], num_heads=4)
 
         self.init_weights(pretrained=pretrained)
 
@@ -322,11 +322,11 @@ class PixelFormerSG(nn.Module):
 
         # 2. Kết hợp với qX qua cross-attention (giả sử bạn có CrossAttnBlock sẵn)
         q4 = self.decoder(enc_feats)
-        if self.combine_option == "plus":
-            sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
-            q4 = q4 + sg_feat_q4
-        elif self.combine_option == "cross-attn":
-            q4 = self.cross_attn_q4(q4, sg_feat_q4)
+        # if self.combine_option == "plus":
+        sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+        q4 = q4 + sg_feat_q4
+        # elif self.combine_option == "cross-attn":
+        #     q4 = self.cross_attn_q4(q4, sg_feat_q4)
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
