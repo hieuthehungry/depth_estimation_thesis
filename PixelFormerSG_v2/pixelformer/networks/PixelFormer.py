@@ -19,7 +19,7 @@ from torchvision.ops import box_iou
 #         matched_indices.append(idx if max_iou > iou_threshold else -1)
 #     return matched_indices
 
-def match_box_indices(boxes, reference_boxes, iou_threshold=0.9):
+def match_box_indices(boxes, reference_boxes, iou_threshold=0.6):
     """
     boxes: Tensor [T, 4] — each row is (x1, y1, x2, y2)
     reference_boxes: Tensor [N, 4]
@@ -109,8 +109,13 @@ class SceneGraphEncoder(nn.Module):
 
             pooled_nodes = roi_align(feat_map, rois, output_size=self.roi_size,
                                      spatial_scale=scale, aligned=True)
-            pooled_nodes = pooled_nodes.mean(dim=[2, 3])  # [N_obj, C]
+            print("Hehehe")
             print(pooled_nodes.shape)
+            print("Hehehe")
+            pooled_nodes = pooled_nodes.mean(dim=[2, 3])  # [N_obj, C]
+            print("Hehehe")
+            print(pooled_nodes.shape)
+            print("Hehehe")
             node_feats = self.node_proj(pooled_nodes)     # [N_obj, D]
             node_feat_list.append(node_feats)
 
