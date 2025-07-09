@@ -306,10 +306,10 @@ class PixelFormerSG(nn.Module):
 
         # NEW: condition q4 with object tokens
         # 2. Incorporate object tokens
-        if all(k in scene_graph for k in ['pred_boxes', 'sub_boxes', 'obj_boxes', 'rel_logits']):
+        if all(k in scene_graph for k in ['sub_boxes', 'obj_boxes', 'rel_logits']):
             B, _, H, W = imgs.shape
             sg_feat_q4 = self.sg_encoder_q4(
-                enc_feats[3], 
+                enc_feats[3],
                 scene_graph['sub_boxes'], 
                 scene_graph['obj_boxes'], 
                 scene_graph['rel_logits'],

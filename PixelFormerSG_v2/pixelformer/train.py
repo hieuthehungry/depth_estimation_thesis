@@ -94,6 +94,12 @@ if args.dataset == 'kitti' or args.dataset == 'nyu':
 elif args.dataset == 'kittipred':
     from dataloaders.dataloader_kittipred import NewDataLoader
 
+def flip_boxes_cxcywh(boxes: torch.Tensor) -> torch.Tensor:
+    boxes_flipped = boxes.clone()
+    boxes_flipped[..., 0] = 1.0 - boxes[..., 0]  # flip x-center
+    return boxes_flipped
+
+
 
 def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
     eval_measures = torch.zeros(10).cuda(device=gpu)
@@ -113,8 +119,20 @@ def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
             pred_depth = model(image, scene_graph = scene_graph
                                         )
             if post_process:
+                # --- During evaluation:
+                # Flip image
+
+                # Flip scene graph bounding boxes
+                scene_graph_flipped = {
+                    'sub_boxes': flip_boxes_cxcywh(scene_graph['sub_boxes']),
+                    'obj_boxes': flip_boxes_cxcywh(scene_graph['obj_boxes']),
+                    'rel_logits': scene_graph['rel_logits']  # unchanged
+                }
+
+                # Predict on flipped image and flipped scene graph
                 image_flipped = flip_lr(image)
-                pred_depth_flipped = model(image_flipped, scene_graph = scene_graph)
+                pred_depth_flipped = model(image_flipped, scene_graph=scene_graph_flipped)
+                # Post-process
                 pred_depth = post_process_depth(pred_depth, pred_depth_flipped)
             end_time = time()
             timer.append(end_time - start_time)
