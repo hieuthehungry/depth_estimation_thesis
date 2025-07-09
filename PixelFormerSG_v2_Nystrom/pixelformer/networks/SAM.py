@@ -147,8 +147,8 @@ class WindowAttention(nn.Module):
 class SAMBLOCK(nn.Module):
     def __init__(
         self,
-        dim,                # embed_dim for input x
-        v_dim,              # v_dim for external feature v
+        dim,
+        v_dim,
         num_heads=4,
         num_landmarks=64,
         mlp_ratio=4.0,
@@ -161,12 +161,14 @@ class SAMBLOCK(nn.Module):
         self.norm_q = norm_layer(dim)
         self.norm_kv = norm_layer(v_dim)
 
+        # Project v to same dim as q
+        self.kv_proj = nn.Linear(v_dim, dim)
+
         self.attn = NystromAttention(
             dim=dim,
             dim_head=dim // num_heads,
             heads=num_heads,
             num_landmarks=num_landmarks,
-            kv_dim=v_dim,
             attn_dropout=attn_drop,
             dropout=drop
         )
@@ -180,8 +182,9 @@ class SAMBLOCK(nn.Module):
         # x: (B, N, dim), v: (B, N, v_dim)
         x_norm = self.norm_q(x)
         v_norm = self.norm_kv(v)
+        v_proj = self.kv_proj(v_norm)  # Project v -> dim
 
-        attn_out = self.attn(x_norm, v_norm)  # Cross-attention
+        attn_out = self.attn(x_norm, v_proj)
         x = x + self.drop_path(attn_out)
         x = x + self.drop_path(self.mlp(self.norm_out(x)))
         return x
