@@ -166,7 +166,40 @@ import torch
 import torch.nn.functional as F
 from torchvision.ops import roi_align
 
+class CrossAttnBlock(nn.Module):
+    def __init__(self, dim, num_heads=4, dropout=0.0):
+        super().__init__()
+        self.norm_q = nn.LayerNorm(dim)
+        self.norm_kv = nn.LayerNorm(dim)
 
+        self.q_proj = nn.Linear(dim, dim)
+        self.k_proj = nn.Linear(dim, dim)
+        self.v_proj = nn.Linear(dim, dim)
+        self.out_proj = nn.Linear(dim, dim)
+
+        self.attn = nn.MultiheadAttention(embed_dim=dim, num_heads=num_heads, dropout=dropout, batch_first=True)
+
+    def forward(self, q_feat, sg_feat):
+        """
+        q_feat: [B, C, H, W]
+        sg_feat: [B, N, C] (node features from scene graph encoder)
+        """
+        B, C, H, W = q_feat.shape
+        q_flat = q_feat.flatten(2).transpose(1, 2)  # [B, HW, C]
+        q_flat = self.norm_q(q_flat)
+        kv_feat = self.norm_kv(sg_feat)  # [B, N, C]
+
+        # Project to Q, K, V
+        Q = self.q_proj(q_flat)   # [B, HW, C]
+        K = self.k_proj(kv_feat)  # [B, N, C]
+        V = self.v_proj(kv_feat)  # [B, N, C]
+
+        # Cross Attention
+        attn_out, _ = self.attn(Q, K, V)  # [B, HW, C]
+
+        # Output
+        out = self.out_proj(attn_out).transpose(1, 2).view(B, C, H, W)
+        return q_feat + out  # residual connection
 
 
 
@@ -174,13 +207,14 @@ from torchvision.ops import roi_align
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, combine_option = "cross-attn", **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
         self.with_auxiliary_head = False
         self.with_neck = False
-
+        assert combine_option in ["plus", "cross-attn"]
+        self.combine_option = combine_option
         norm_cfg = dict(type='BN', requires_grad=True)
         # norm_cfg = dict(type='GN', requires_grad=True, num_groups=8)
 
@@ -240,7 +274,9 @@ class PixelFormerSG(nn.Module):
         self.disp_head1 = DispHead(input_dim=sam_dims[0])
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
-        self.sg_encoder = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
+        self.sg_encoder_q4 = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
+        self.cross_attn_q4 = CrossAttnBlock(dim=512, num_heads=8)
+
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
@@ -273,15 +309,18 @@ class PixelFormerSG(nn.Module):
         if all(k in scene_graph for k in ['pred_boxes', 'sub_boxes', 'obj_boxes', 'rel_logits']):
             B, _, H, W = imgs.shape
             image_shapes = [(H, W)] * B
-            sg_feat = self.sg_encoder(
+            sg_feat_q4 = self.sg_encoder_q4(
                 enc_feats[3], 
                 scene_graph['sub_boxes'], 
                 scene_graph['obj_boxes'], 
                 scene_graph['rel_logits'],
             )
-            sg_feat = sg_feat.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
-            q4 = q4 + sg_feat
-
+            sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            if self.combine_option == "plus":
+                q4 = q4 + sg_feat_q4
+            elif self.combine_option == "cross-attn":
+                q4 = self.cross_attn_q4(q4, sg_feat_q4)
+                
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
         q2 = self.sam3(enc_feats[2], q3)
