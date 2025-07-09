@@ -207,7 +207,7 @@ class CrossAttnBlock(nn.Module):
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, combine_option = "cross-attn", **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, combine_option = "plus", **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
@@ -322,19 +322,36 @@ class PixelFormerSG(nn.Module):
 
         # 2. Kết hợp với qX qua cross-attention (giả sử bạn có CrossAttnBlock sẵn)
         q4 = self.decoder(enc_feats)
-        q4 = self.cross_attn_q4(q4, sg_feat_q4)
+        if self.combine_option == "plus":
+            sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            q4 = q4 + sg_feat_q4
+        elif self.combine_option == "cross-attn":
+            q4 = self.cross_attn_q4(q4, sg_feat_q4)
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
-        q3 = self.cross_attn_q3(q3, sg_feat_q3)
+        if self.combine_option == "plus":
+            sg_feat_q3 = sg_feat_q3.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            q3 = q3 + sg_feat_q3
+        elif self.combine_option == "cross-attn":
+            q3 = self.cross_attn_q3(q3, sg_feat_q3)
 
         q2 = self.sam3(enc_feats[2], q3)
         q2 = nn.PixelShuffle(2)(q2)
-        q2 = self.cross_attn_q2(q2, sg_feat_q2)
+        if self.combine_option == "plus":
+            sg_feat_q2 = sg_feat_q2.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            q2 = q2 + sg_feat_q2
+        elif self.combine_option == "cross-attn":
+            q2 = self.cross_attn_q2(q2, sg_feat_q2)
 
         q1 = self.sam2(enc_feats[1], q2)
         q1 = nn.PixelShuffle(2)(q1)
-        q1 = self.cross_attn_q1(q1, sg_feat_q1)
+        if self.combine_option == "plus":
+            sg_feat_q1 = sg_feat_q1.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            q1 = q1 + sg_feat_q1
+        elif self.combine_option == "cross-attn":
+            q1 = self.cross_attn_q1(q1, sg_feat_q1)
+
         q0 = self.sam1(enc_feats[0], q1)
         bin_centers = self.bcp(q4)
         f = self.disp_head1(q0, bin_centers, 4)
