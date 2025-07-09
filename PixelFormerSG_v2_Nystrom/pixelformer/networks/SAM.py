@@ -169,7 +169,6 @@ class SAMBLOCK(nn.Module):
             dim_head=dim // num_heads,
             heads=num_heads,
             num_landmarks=num_landmarks,
-            attn_dropout=attn_drop,
             dropout=drop
         )
 
