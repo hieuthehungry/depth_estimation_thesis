@@ -63,7 +63,7 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
     return edge_index_list, edge_type_list
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, enc_dim, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
+    def __init__(self, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
         super().__init__()
         self.roi_size = feat_size
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
