@@ -308,19 +308,19 @@ class PixelFormerSG(nn.Module):
         # 2. Incorporate object tokens
         if all(k in scene_graph for k in ['pred_boxes', 'sub_boxes', 'obj_boxes', 'rel_logits']):
             B, _, H, W = imgs.shape
-            image_shapes = [(H, W)] * B
             sg_feat_q4 = self.sg_encoder_q4(
                 enc_feats[3], 
                 scene_graph['sub_boxes'], 
                 scene_graph['obj_boxes'], 
                 scene_graph['rel_logits'],
             )
-            sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
+            
             if self.combine_option == "plus":
+                sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
                 q4 = q4 + sg_feat_q4
             elif self.combine_option == "cross-attn":
                 q4 = self.cross_attn_q4(q4, sg_feat_q4)
-                
+
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
         q2 = self.sam3(enc_feats[2], q3)
