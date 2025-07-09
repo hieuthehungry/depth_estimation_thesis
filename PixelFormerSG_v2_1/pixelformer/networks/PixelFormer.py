@@ -63,15 +63,15 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
     return edge_index_list, edge_type_list
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
+    def __init__(self, enc_dim, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
         super().__init__()
         self.roi_size = feat_size
         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
         self.relation_embed = nn.Embedding(rel_classes, node_dim)
-        # self.project = nn.Sequential(
-        #     nn.Linear(enc_dim, node_dim),  # assuming enc_feat has 1024 channels
-        #     nn.GELU()
-        # )
+        self.project = nn.Sequential(
+            nn.Linear(enc_dim, node_dim),  # assuming enc_feat has 1024 channels
+            nn.GELU()
+        )
 
     def extract_roi_feats(self, feat_map, boxes, image_size):
         """ROIAlign wrapper"""
@@ -109,9 +109,9 @@ class SceneGraphEncoder(nn.Module):
         obj_feat = self.extract_roi_feats(enc_feat, obj_boxes, (H_img, W_img))  # [B, T, C]
 
         # Step 2: Project to node_dim
-        # sub_proj = self.project(sub_feat)  # [B, T, D]
-        # obj_proj = self.project(obj_feat)  # [B, T, D]
-        node_feat = torch.cat([sub_feat, obj_feat], dim=1)  # [B, 2T, D]
+        sub_proj = self.project(sub_feat)  # [B, T, D]
+        obj_proj = self.project(obj_feat)  # [B, T, D]
+        node_feat = torch.cat([sub_proj, obj_proj], dim=1)  # [B, 2T, D]
 
         # Step 3: Prepare edge_index and edge_attr
         outputs = []
@@ -276,7 +276,7 @@ class PixelFormerSG(nn.Module):
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         
         # scene graph encoder
-        self.sg_encoder_q4 = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
+        self.sg_encoder_q4 = SceneGraphEncoder(enc_dim = in_channels[3], node_dim=v_dims[3], out_dim=v_dims[3])
         # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
         # self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
