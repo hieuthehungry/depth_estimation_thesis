@@ -275,7 +275,6 @@ class PixelFormerSG(nn.Module):
             image_shapes = [(H, W)] * B
             sg_feat = self.sg_encoder(
                 enc_feats[3], 
-                scene_graph['pred_boxes'],
                 scene_graph['sub_boxes'], 
                 scene_graph['obj_boxes'], 
                 scene_graph['rel_logits'],
