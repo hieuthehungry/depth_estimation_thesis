@@ -168,6 +168,8 @@ class SceneGraphEncoder(nn.Module):
 
         outputs = []
         for b in range(B):
+            print(node_feat_list[b].shape)
+            print(edge_attr_list[b].shape)
             out = self.gat(node_feat_list[b], edge_index_list[b], edge_attr_list[b])
             outputs.append(out)
         return torch.stack(outputs, dim=0)  # [B, N_obj, D]
