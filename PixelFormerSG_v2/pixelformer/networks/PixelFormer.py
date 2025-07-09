@@ -220,7 +220,7 @@ from torchvision.ops import roi_align
 class PixelFormerSG(nn.Module):
 
     def __init__(self, version=None, inv_depth=False, pretrained=None, 
-                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, node_dim=512, **kwargs):
+                    frozen_stages=-1, min_depth=0.1, max_depth=100.0, **kwargs):
         super().__init__()
 
         self.inv_depth = inv_depth
@@ -286,7 +286,7 @@ class PixelFormerSG(nn.Module):
         self.disp_head1 = DispHead(input_dim=sam_dims[0])
 
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
-        self.sg_encoder = SceneGraphEncoder(node_dim=in_channels[3], out_dim=in_channels[3])
+        self.sg_encoder = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
