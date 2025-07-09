@@ -278,7 +278,6 @@ class PixelFormerSG(nn.Module):
                 scene_graph['sub_boxes'], 
                 scene_graph['obj_boxes'], 
                 scene_graph['rel_logits'],
-                image_shapes
             )
             sg_feat = sg_feat.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
             print(q4.shape)
