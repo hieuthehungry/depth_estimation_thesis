@@ -393,6 +393,8 @@ class DINOv2Backbone(nn.Module):
         self.image_processor = AutoImageProcessor.from_pretrained(model_name)
 
     def forward(self, x):
+        with torch.no_grad():
+            x = self.image_processor(images=x, return_tensors="pt").pixel_values.to(x.device)
         outputs = self.backbone(x, output_hidden_states=True)
         hidden_states = outputs.hidden_states
         features = []
@@ -467,8 +469,6 @@ class PixelFormerSG(nn.Module):
                 self.auxiliary_head.init_weights()
 
     def forward(self, imgs, scene_graph):
-        with torch.no_grad():
-            imgs = self.image_processor(images=imgs, return_tensors="pt").pixel_values.to(imgs.device)
         enc_feats = self.backbone(imgs)
         if self.with_neck:
             enc_feats = self.neck(enc_feats)
