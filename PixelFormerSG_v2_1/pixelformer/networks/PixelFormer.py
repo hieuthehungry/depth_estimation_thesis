@@ -359,7 +359,7 @@ class SceneGraphEncoder(nn.Module):
             print("Number of boxes----------")
             roi_boxes = rois
             print(roi_boxes.shape)
-            roi_feats = roi_align(feat_map, roi_boxes, output_size=1, spatial_scale=1.0, aligned=True)
+            roi_feats = roi_align(feat_map, roi_boxes, output_size=self.roi_size, spatial_scale=1.0, aligned=True)
             roi_feats = roi_feats.view(roi_feats.size(0), -1)
 
             node_feats = self.node_proj(roi_feats)
