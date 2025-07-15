@@ -45,7 +45,8 @@ parser.add_argument('--min_depth_eval',            type=float, help='minimum dep
 parser.add_argument('--max_depth_eval',            type=float, help='maximum depth for evaluation', default=80)
 parser.add_argument('--eigen_crop',                            help='if set, crops according to Eigen NIPS14', action='store_true')
 parser.add_argument('--garg_crop',                             help='if set, crops according to Garg  ECCV16', action='store_true')
-
+parser.add_argument('--sg_path',                   type=str,   help='path to the scene graph for training', required=False)
+parser.add_argument('--sg_path_eval',            type=str,   help='path to the scene graph for eval', required=False)
 
 if sys.argv.__len__() == 2:
     arg_filename_with_prefix = '@' + sys.argv[1]
