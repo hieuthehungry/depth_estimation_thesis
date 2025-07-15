@@ -390,12 +390,12 @@ class DINOv2Backbone(nn.Module):
         super().__init__()
         self.backbone = Dinov2Model.from_pretrained(model_name, output_hidden_states=True)
         self.out_indices = out_indices
-        self.image_processor = AutoImageProcessor.from_pretrained(model_name)
+        # self.image_processor = AutoImageProcessor.from_pretrained(model_name)
 
     def forward(self, x):
-        with torch.no_grad():
-            x = self.image_processor(images=x, return_tensors="pt").pixel_values.to(x.device)
-        outputs = self.backbone(x, output_hidden_states=True)
+        # with torch.no_grad():
+        #     x = self.image_processor(images=x, return_tensors="pt").pixel_values.to(x.device)
+        outputs = self.backbone(pixel_values = x, output_hidden_states=True)
         hidden_states = outputs.hidden_states
         features = []
         for idx in self.out_indices:
