@@ -356,7 +356,7 @@ class SceneGraphEncoder(nn.Module):
             roi_boxes = torch.cat([batch_idx, rois], dim=1)  # [N, 5]
             
             roi_feats = roi_align(feat_map[b].unsqueeze(0), roi_boxes, output_size=self.roi_size, spatial_scale=1.0, aligned=True)
-            roi_feats = roi_feats.view(roi_feats.size(0), -1)
+            roi_feats = roi_feats.mean(dim=[2, 3])  # global average pooling → [N, C]
 
             node_feats = self.node_proj(roi_feats)
 
