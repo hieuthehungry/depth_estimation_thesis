@@ -393,16 +393,20 @@ class DINOv2Backbone(nn.Module):
         # self.image_processor = AutoImageProcessor.from_pretrained(model_name)
 
     def forward(self, x):
-        # with torch.no_grad():
-        #     x = self.image_processor(images=x, return_tensors="pt").pixel_values.to(x.device)
-        outputs = self.backbone(pixel_values = x, output_hidden_states=True)
+        # x: already normalized (B, 3, H, W)
+        B, _, H, W = x.shape
+        patch_size = 14  # for dinov2-base
+        out_h, out_w = H // patch_size, W // patch_size
+
+        outputs = self.backbone(pixel_values=x, output_hidden_states=True)
         hidden_states = outputs.hidden_states
+
         features = []
         for idx in self.out_indices:
-            feat = hidden_states[idx][:, 1:, :]
+            feat = hidden_states[idx][:, 1:, :]  # remove CLS token
             B, N, C = feat.shape
-            h = w = int(N ** 0.5)
-            feat = feat.transpose(1, 2).reshape(B, C, h, w)
+            assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
+            feat = feat.transpose(1, 2).reshape(B, C, out_h, out_w)
             features.append(feat)
         return features
 
