@@ -392,11 +392,11 @@ class DINOv2Backbone(nn.Module):
         self.out_indices = out_indices
         self.image_processor = AutoImageProcessor.from_pretrained(model_name)
 
-        hidden_size = self.backbone.config.hidden_size
-        self.channel_projs = nn.ModuleList([
-            nn.Conv2d(hidden_size, out_ch, kernel_size=1)
-            for out_ch in out_channels
-        ])
+        # hidden_size = self.backbone.config.hidden_size
+        # self.channel_projs = nn.ModuleList([
+        #     nn.Conv2d(hidden_size, out_ch, kernel_size=1)
+        #     for out_ch in out_channels
+        # ])
 
     def forward(self, x):
         B, _, H, W = x.shape
