@@ -369,7 +369,7 @@ class SceneGraphEncoder(nn.Module):
             edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
             edge_attr = self.edge_proj(edge_attr_input)  # [E, D]
 
-            node_feats = self.gnn(node_feats, sg_data_list[b].edge_index, edge_attr)
+            node_feats = self.gnn(node_feats, sg_data_list[b]["edge_index"], edge_attr)
             outputs.append(node_feats)
         outputs = torch.stack(outputs, dim = 0)
         print(outputs.shape)
