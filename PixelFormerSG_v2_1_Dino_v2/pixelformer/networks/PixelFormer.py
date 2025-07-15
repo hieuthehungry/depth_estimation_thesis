@@ -433,7 +433,7 @@ class PixelFormerSG(nn.Module):
         self.combine_option = combine_option
         norm_cfg = dict(type='BN', requires_grad=True)
 
-        embed_dim = 768
+        embed_dim = 512
         # in_channels = [128, 256, 512, 1024]  # updated channels after projection
         in_channels = [768, 768, 768, 768]
         decoder_cfg = dict(
