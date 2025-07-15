@@ -202,6 +202,155 @@ class CrossAttnBlock(nn.Module):
         return q_feat + out  # residual connection
 
 
+import torch
+import torch.nn as nn
+from torchvision.ops import box_iou, roi_align
+from torch_geometric.data import Data, Batch
+from torch_geometric.nn import GATConv
+
+
+class SceneGraphBuilder(nn.Module):
+    def __init__(self, num_rel_classes, topk=10, conf_thresh=0.3, iou_thresh=0.6):
+        super().__init__()
+        self.topk = topk
+        self.conf_thresh = conf_thresh
+        self.iou_thresh = iou_thresh
+        self.num_rel_classes = num_rel_classes
+    
+    def xywh_to_xyxy(self, boxes):
+        # Convert [x_center, y_center, w, h] -> [x1, y1, x2, y2]
+        x_c, y_c, w, h = boxes.unbind(dim=1)
+        x1 = x_c - 0.5 * w
+        y1 = y_c - 0.5 * h
+        x2 = x_c + 0.5 * w
+        y2 = y_c + 0.5 * h
+        return torch.stack([x1, y1, x2, y2], dim=1)
+
+
+    def forward(self, scene_graph):
+        """
+        scene_graph: dict with keys: sub_boxes, obj_boxes, sub_logits, obj_logits, rel_logits
+        Returns:
+            node_boxes [N, 4], node_labels [N], edge_index [2, K], edge_attr [K, R+1]
+        """
+        results = []
+        B = scene_graph['rel_logits'].size(0)
+
+        for b in range(B):
+            rel_logits = scene_graph['rel_logits'][b]        # [N, R+1]
+            sub_logits = scene_graph['sub_logits'][b]        # [N, C+1]
+            obj_logits = scene_graph['obj_logits'][b]
+    
+            probas_rel = rel_logits.softmax(-1)[:, :-1]
+            probas_sub = sub_logits.softmax(-1)[:, :-1]
+            probas_obj = obj_logits.softmax(-1)[:, :-1]
+    
+            keep = (probas_rel.max(-1).values > self.conf_thresh) & \
+                   (probas_sub.max(-1).values > self.conf_thresh) & \
+                   (probas_obj.max(-1).values > self.conf_thresh)
+    
+            keep_queries = torch.nonzero(keep, as_tuple=True)[0]
+            scores = probas_rel[keep_queries].max(-1)[0] * \
+                     probas_sub[keep_queries].max(-1)[0] * \
+                     probas_obj[keep_queries].max(-1)[0]
+    
+            top_indices = torch.argsort(-scores)[:self.topk]
+            keep_queries = keep_queries[top_indices]
+    
+            sub_boxes = scene_graph['sub_boxes'][b][keep_queries]  # [K, 4]
+            obj_boxes = scene_graph['obj_boxes'][b][keep_queries]  # [K, 4]
+            sub_labels = sub_logits[keep_queries, :-1].argmax(-1)  # [K]
+            obj_labels = obj_logits[keep_queries, :-1].argmax(-1)  # [K]
+            rel_feats = rel_logits[keep_queries]                   # [K, R+1]
+    
+            num_rels = sub_boxes.size(0)
+    
+            # === Merge subject and object boxes ===
+            boxes = torch.cat([sub_boxes, obj_boxes], dim=0)       # [2K, 4]
+            labels = torch.cat([sub_labels, obj_labels], dim=0)    # [2K]
+    
+            # === IoU-based deduplication with label agreement ===
+            boxes_xyxy = self.xywh_to_xyxy(boxes)
+    
+            # === IoU-based deduplication with label agreement ===
+            iou_matrix = box_iou(boxes_xyxy, boxes_xyxy)
+            
+            node_map = torch.arange(len(boxes))
+            for i in range(len(boxes)):
+                for j in range(i):
+                    if labels[i] == labels[j] and iou_matrix[i, j] >= self.iou_thresh:
+                        node_map[i] = node_map[j]
+    
+            _, unique_indices = torch.unique(node_map, return_inverse=True)
+            dedup_boxes = []
+            dedup_labels = []
+            seen = {}
+            for i, new_idx in enumerate(unique_indices):
+                if new_idx.item() not in seen:
+                    dedup_boxes.append(boxes[i])
+                    dedup_labels.append(labels[i])
+                    seen[new_idx.item()] = True
+    
+            node_boxes = torch.stack(dedup_boxes) if dedup_boxes else boxes
+            node_labels = torch.stack(dedup_labels) if dedup_labels else labels
+    
+            subj_ids = unique_indices[:num_rels]
+            obj_ids = unique_indices[num_rels:]
+            edge_index = torch.stack([subj_ids, obj_ids], dim=0)  # [2, K]
+            
+            results.append({
+                'node_boxes': node_boxes,        # [N, 4] in xywh
+                'node_labels': node_labels,      # [N] - class indices 0-151
+                'edge_index': edge_index,        # [2, K]
+                'edge_attr': rel_feats           # [K, R+1]
+            })
+        return results
+
+class SceneGraphEncoder(nn.Module):
+    def __init__(self, feat_dim, hidden_dim):
+        super().__init__()
+        self.node_proj = nn.Sequential(
+            nn.Linear(feat_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+        self.edge_proj = nn.Sequential(
+            nn.Linear(52, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+        self.gnn = GATConv(hidden_dim, hidden_dim)
+
+    def xywh_to_xyxy(self, boxes):
+        x_c, y_c, w, h = boxes.unbind(dim=-1)
+        x1 = x_c - 0.5 * w
+        y1 = y_c - 0.5 * h
+        x2 = x_c + 0.5 * w
+        y2 = y_c + 0.5 * h
+        return torch.stack([x1, y1, x2, y2], dim=-1)
+        
+
+    def forward(self, feat_map, sg_data_list):
+        B, C, H, W = feat_map.shape
+        batch = Batch.from_data_list(sg_data_list)
+
+        # Convert box format before scaling
+        rois = self.xywh_to_xyxy(batch.x)  # <- fix here
+        rois[:, 0::2] *= W
+        rois[:, 1::2] *= H
+
+        roi_boxes = torch.cat([
+            batch.batch.unsqueeze(1).float(), rois
+        ], dim=1)  # [N, 5]
+
+        roi_feats = roi_align(feat_map, roi_boxes, output_size=1, spatial_scale=1.0, aligned=True)
+        roi_feats = roi_feats.view(roi_feats.size(0), -1)
+
+        node_feats = self.node_proj(roi_feats)
+        edge_attr = self.edge_proj(batch.edge_attr)
+        node_feats = self.gnn(node_feats, batch.edge_index)
+
+        return node_feats, batch.edge_index, edge_attr
 
 
 class PixelFormerSG(nn.Module):
@@ -276,7 +425,8 @@ class PixelFormerSG(nn.Module):
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         
         # scene graph encoder
-        self.sg_encoder_q4 = SceneGraphEncoder(enc_dim = in_channels[3], node_dim=v_dims[3], out_dim=v_dims[3])
+        self.sg_encoder_q4 = SceneGraphEncoder(enc_dim=in_channels[3], node_dim=v_dims[3], out_dim=v_dims[3])
+        self.sg_builder = SceneGraphBuilder(iou_threshold=0.6)
         # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
         # self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
@@ -312,16 +462,26 @@ class PixelFormerSG(nn.Module):
         if self.with_neck:
             enc_feats = self.neck(enc_feats)
 
-        q4 = self.decoder(enc_feats)
 
         # 1. Scene graph features cho từng tầng
-        sg_feat_q4 = self.sg_encoder_q4(enc_feats[3], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
+        graph_data_list = self.sg_builder(scene_graph)
+        graph_data_objs = [
+            Data(
+                x=graph['node_boxes'],
+                y=graph['node_labels'],
+                edge_index=graph['edge_index'],
+                edge_attr=graph['edge_attr']
+            )
+            for graph in graph_data_list
+        ]
+        sg_feat_q4 = self.sg_encoder_q4(enc_feats[3], graph_data_objs)
         # sg_feat_q3 = self.sg_encoder_q3(enc_feats[2], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
         # sg_feat_q2 = self.sg_encoder_q2(enc_feats[1], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
         # sg_feat_q1 = self.sg_encoder_q1(enc_feats[0], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
 
         # 2. Kết hợp với qX qua cross-attention (giả sử bạn có CrossAttnBlock sẵn)
         q4 = self.decoder(enc_feats)
+        
         # if self.combine_option == "plus":
         sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
         q4 = q4 + sg_feat_q4
