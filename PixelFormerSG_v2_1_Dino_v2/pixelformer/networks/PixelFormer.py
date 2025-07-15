@@ -386,34 +386,35 @@ import torch.nn as nn
 from transformers import AutoImageProcessor, Dinov2Model
 
 class DINOv2Backbone(nn.Module):
-    def __init__(self, model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11)):
+    def __init__(self, model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11), out_channels=[128, 256, 512, 1024]):
         super().__init__()
         self.backbone = Dinov2Model.from_pretrained(model_name, output_hidden_states=True)
         self.out_indices = out_indices
-        # self.image_processor = AutoImageProcessor.from_pretrained(model_name)
+        self.image_processor = AutoImageProcessor.from_pretrained(model_name)
+
+        hidden_size = self.backbone.config.hidden_size
+        self.channel_projs = nn.ModuleList([
+            nn.Conv2d(hidden_size, out_ch, kernel_size=1)
+            for out_ch in out_channels
+        ])
 
     def forward(self, x):
-        # x: already normalized (B, 3, H, W)
         B, _, H, W = x.shape
-        patch_size = 14  # for dinov2-base
+        patch_size = 14  # DINOv2-base has 14x14 patch size
         out_h, out_w = H // patch_size, W // patch_size
 
         outputs = self.backbone(pixel_values=x, output_hidden_states=True)
         hidden_states = outputs.hidden_states
 
         features = []
-        for idx in self.out_indices:
+        for i, idx in enumerate(self.out_indices):
             feat = hidden_states[idx][:, 1:, :]  # remove CLS token
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).reshape(B, C, out_h, out_w)
+            feat = self.channel_projs[i](feat)
             features.append(feat)
         return features
-
-import torch
-import torch.nn as nn
-from transformers import Dinov2Model
-
 
 class PixelFormerSG(nn.Module):
 
@@ -428,8 +429,8 @@ class PixelFormerSG(nn.Module):
         self.combine_option = combine_option
         norm_cfg = dict(type='BN', requires_grad=True)
 
-        embed_dim = 768
-        in_channels = [768, 768, 768, 768]  # DINOv2-base out_channels for each selected block
+        embed_dim = 512
+        in_channels = [128, 256, 512, 1024]  # updated channels after projection
 
         decoder_cfg = dict(
             in_channels=in_channels,
@@ -442,13 +443,11 @@ class PixelFormerSG(nn.Module):
             align_corners=False
         )
 
-        self.backbone = DINOv2Backbone(model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11))
+        self.backbone = DINOv2Backbone(model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11), out_channels=in_channels)
         v_dim = decoder_cfg['num_classes']*4
         win = 7
-        # sam_dims = [128, 256, 512, 1024]
-        sam_dims = [768, 768, 768, 768]
-        v_dims = [768, 768, 768, 768] 
-        # v_dims = [64, 128, 256, embed_dim]
+        sam_dims = in_channels
+        v_dims = [64, 128, 256, embed_dim]
         self.sam4 = SAM(input_dim=in_channels[3], embed_dim=sam_dims[3], window_size=win, v_dim=v_dims[3], num_heads=32)
         self.sam3 = SAM(input_dim=in_channels[2], embed_dim=sam_dims[2], window_size=win, v_dim=v_dims[2], num_heads=16)
         self.sam2 = SAM(input_dim=in_channels[1], embed_dim=sam_dims[1], window_size=win, v_dim=v_dims[1], num_heads=8)
@@ -475,6 +474,7 @@ class PixelFormerSG(nn.Module):
                 self.auxiliary_head.init_weights()
 
     def forward(self, imgs, scene_graph):
+
         enc_feats = self.backbone(imgs)
         if self.with_neck:
             enc_feats = self.neck(enc_feats)
@@ -488,8 +488,7 @@ class PixelFormerSG(nn.Module):
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
-        print(enc_feats[2].shape)
-        print(q3.shape)
+
         q2 = self.sam3(enc_feats[2], q3)
         q2 = nn.PixelShuffle(2)(q2)
 
@@ -501,6 +500,7 @@ class PixelFormerSG(nn.Module):
         f = self.disp_head1(q0, bin_centers, 4)
 
         return f
+
 
 
 class DispHead(nn.Module):
