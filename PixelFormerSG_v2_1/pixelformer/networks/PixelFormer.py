@@ -62,73 +62,73 @@ def extract_scene_graph_edges(sub_boxes, obj_boxes, rel_logits, pred_boxes, iou_
         edge_type_list.append(edge_type)
     return edge_index_list, edge_type_list
 
-class SceneGraphEncoder(nn.Module):
-    def __init__(self, enc_dim, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
-        super().__init__()
-        self.roi_size = feat_size
-        self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
-        self.relation_embed = nn.Embedding(rel_classes, node_dim)
-        self.project = nn.Sequential(
-            nn.Linear(enc_dim, node_dim),  # assuming enc_feat has 1024 channels
-            nn.GELU()
-        )
+# class SceneGraphEncoder(nn.Module):
+#     def __init__(self, enc_dim, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
+#         super().__init__()
+#         self.roi_size = feat_size
+#         self.gat = GATConv(node_dim, out_dim, edge_dim=node_dim)
+#         self.relation_embed = nn.Embedding(rel_classes, node_dim)
+#         self.project = nn.Sequential(
+#             nn.Linear(enc_dim, node_dim),  # assuming enc_feat has 1024 channels
+#             nn.GELU()
+#         )
 
-    def extract_roi_feats(self, feat_map, boxes, image_size):
-        """ROIAlign wrapper"""
-        B, T, _ = boxes.shape
-        _, _, H, W = feat_map.shape
-        all_rois = []
+#     def extract_roi_feats(self, feat_map, boxes, image_size):
+#         """ROIAlign wrapper"""
+#         B, T, _ = boxes.shape
+#         _, _, H, W = feat_map.shape
+#         all_rois = []
 
-        for b in range(B):
-            cx, cy, w, h = boxes[b].unbind(-1)
-            x1 = (cx - w / 2) * image_size[1]
-            y1 = (cy - h / 2) * image_size[0]
-            x2 = (cx + w / 2) * image_size[1]
-            y2 = (cy + h / 2) * image_size[0]
-            coords = torch.stack([x1, y1, x2, y2], dim=-1)  # [T, 4]
-            img_inds = torch.full((T, 1), b, device=boxes.device)
-            rois = torch.cat([img_inds, coords], dim=-1)  # [T, 5]
-            all_rois.append(rois)
+#         for b in range(B):
+#             cx, cy, w, h = boxes[b].unbind(-1)
+#             x1 = (cx - w / 2) * image_size[1]
+#             y1 = (cy - h / 2) * image_size[0]
+#             x2 = (cx + w / 2) * image_size[1]
+#             y2 = (cy + h / 2) * image_size[0]
+#             coords = torch.stack([x1, y1, x2, y2], dim=-1)  # [T, 4]
+#             img_inds = torch.full((T, 1), b, device=boxes.device)
+#             rois = torch.cat([img_inds, coords], dim=-1)  # [T, 5]
+#             all_rois.append(rois)
 
-        rois = torch.cat(all_rois, dim=0)  # [B*T, 5]
-        roi_feats = roi_align(
-            feat_map, rois, output_size=self.roi_size,
-            spatial_scale=float(W) / image_size[1],
-            aligned=True
-        )  # [B*T, C, H, W]
-        pooled = roi_feats.mean(dim=[2, 3])  # [B*T, C]
-        return pooled.view(B, T, -1)  # [B, T, C]
+#         rois = torch.cat(all_rois, dim=0)  # [B*T, 5]
+#         roi_feats = roi_align(
+#             feat_map, rois, output_size=self.roi_size,
+#             spatial_scale=float(W) / image_size[1],
+#             aligned=True
+#         )  # [B*T, C, H, W]
+#         pooled = roi_feats.mean(dim=[2, 3])  # [B*T, C]
+#         return pooled.view(B, T, -1)  # [B, T, C]
 
-    def forward(self, enc_feat, sub_boxes, obj_boxes, rel_logits):
-        B, T, _ = rel_logits.shape
-        H_img, W_img =  enc_feat.shape[-2] * 4, enc_feat.shape[-1] * 4  # assume 1/4 scale from image
-        device = enc_feat.device
+#     def forward(self, enc_feat, sub_boxes, obj_boxes, rel_logits):
+#         B, T, _ = rel_logits.shape
+#         H_img, W_img =  enc_feat.shape[-2] * 4, enc_feat.shape[-1] * 4  # assume 1/4 scale from image
+#         device = enc_feat.device
 
-        # Step 1: Extract RoI features for sub & obj boxes
-        sub_feat = self.extract_roi_feats(enc_feat, sub_boxes, (H_img, W_img))  # [B, T, C]
-        obj_feat = self.extract_roi_feats(enc_feat, obj_boxes, (H_img, W_img))  # [B, T, C]
+#         # Step 1: Extract RoI features for sub & obj boxes
+#         sub_feat = self.extract_roi_feats(enc_feat, sub_boxes, (H_img, W_img))  # [B, T, C]
+#         obj_feat = self.extract_roi_feats(enc_feat, obj_boxes, (H_img, W_img))  # [B, T, C]
 
-        # Step 2: Project to node_dim
-        sub_proj = self.project(sub_feat)  # [B, T, D]
-        obj_proj = self.project(obj_feat)  # [B, T, D]
-        node_feat = torch.cat([sub_proj, obj_proj], dim=1)  # [B, 2T, D]
+#         # Step 2: Project to node_dim
+#         sub_proj = self.project(sub_feat)  # [B, T, D]
+#         obj_proj = self.project(obj_feat)  # [B, T, D]
+#         node_feat = torch.cat([sub_proj, obj_proj], dim=1)  # [B, 2T, D]
 
-        # Step 3: Prepare edge_index and edge_attr
-        outputs = []
-        for b in range(B):
-            edge_index = torch.stack([
-                torch.arange(0, T, device=device),
-                torch.arange(T, 2 * T, device=device)
-            ], dim=0)  # [2, T]
+#         # Step 3: Prepare edge_index and edge_attr
+#         outputs = []
+#         for b in range(B):
+#             edge_index = torch.stack([
+#                 torch.arange(0, T, device=device),
+#                 torch.arange(T, 2 * T, device=device)
+#             ], dim=0)  # [2, T]
 
-            rel_cls = torch.argmax(F.softmax(rel_logits[b, :, :-1], dim=-1), dim=-1)  # [T]
-            edge_attr = self.relation_embed(rel_cls)  # [T, D]
+#             rel_cls = torch.argmax(F.softmax(rel_logits[b, :, :-1], dim=-1), dim=-1)  # [T]
+#             edge_attr = self.relation_embed(rel_cls)  # [T, D]
 
-            # Run GAT
-            out = self.gat(node_feat[b], edge_index, edge_attr)  # [2T, out_dim]
-            outputs.append(out)
+#             # Run GAT
+#             out = self.gat(node_feat[b], edge_index, edge_attr)  # [2T, out_dim]
+#             outputs.append(out)
 
-        return torch.stack(outputs, dim=0)  # [B, 2T, out_dim]
+#         return torch.stack(outputs, dim=0)  # [B, 2T, out_dim]
 
 
 class BCP(nn.Module):
@@ -307,7 +307,7 @@ class SceneGraphBuilder(nn.Module):
         return results
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, feat_dim, hidden_dim):
+    def __init__(self, feat_dim, hidden_dim, out_dim):
         super().__init__()
         self.node_proj = nn.Sequential(
             nn.Linear(feat_dim, hidden_dim),
@@ -319,7 +319,7 @@ class SceneGraphEncoder(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim)
         )
-        self.gnn = GATConv(hidden_dim, hidden_dim)
+        self.gnn = GATConv(hidden_dim, out_dim)
 
     def xywh_to_xyxy(self, boxes):
         x_c, y_c, w, h = boxes.unbind(dim=-1)
@@ -348,7 +348,7 @@ class SceneGraphEncoder(nn.Module):
 
         node_feats = self.node_proj(roi_feats)
         edge_attr = self.edge_proj(batch.edge_attr)
-        node_feats = self.gnn(node_feats, batch.edge_index)
+        node_feats = self.gnn(node_feats, batch.edge_index, edge_attr)
 
         return node_feats, batch.edge_index, edge_attr
 
@@ -425,7 +425,7 @@ class PixelFormerSG(nn.Module):
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         
         # scene graph encoder
-        self.sg_encoder_q4 = SceneGraphEncoder(enc_dim=in_channels[3], node_dim=v_dims[3], out_dim=v_dims[3])
+        self.sg_encoder_q4 = SceneGraphEncoder(feat_dim=in_channels[3], hidden_dim=in_channels[3], out_dim=v_dims[3])
         self.sg_builder = SceneGraphBuilder(iou_threshold=0.6)
         # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
