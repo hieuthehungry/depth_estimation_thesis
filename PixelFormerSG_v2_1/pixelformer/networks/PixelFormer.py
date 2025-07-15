@@ -324,12 +324,23 @@ class SceneGraphEncoder(nn.Module):
         self.gnn = GATConv(node_dim, out_dim)
 
     def xywh_to_xyxy(self, boxes):
-        x_c, y_c, w, h = boxes.unbind(dim=-1)
+        """
+        Args:
+            boxes: Tensor of shape [B, T, 4] in (cx, cy, w, h)
+        Returns:
+            Tensor of shape [B, T, 4] in (x1, y1, x2, y2)
+        """
+        x_c = boxes[..., 0]
+        y_c = boxes[..., 1]
+        w = boxes[..., 2]
+        h = boxes[..., 3]
+        
         x1 = x_c - 0.5 * w
         y1 = y_c - 0.5 * h
         x2 = x_c + 0.5 * w
         y2 = y_c + 0.5 * h
-        return torch.stack([x1, y1, x2, y2], dim=-1)
+        
+        return torch.stack([x1, y1, x2, y2], dim=-1)  # [B, T, 4]
         
 
     def forward(self, feat_map, sg_data_list):
