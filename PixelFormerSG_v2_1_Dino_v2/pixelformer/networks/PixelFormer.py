@@ -433,7 +433,8 @@ class PixelFormerSG(nn.Module):
         self.combine_option = combine_option
         norm_cfg = dict(type='BN', requires_grad=True)
 
-        embed_dim = 512
+        # embed_dim = 512
+        embed_dim = 768
         # in_channels = [128, 256, 512, 1024]  # updated channels after projection
         in_channels = [768, 768, 768, 768]
         decoder_cfg = dict(
@@ -460,7 +461,7 @@ class PixelFormerSG(nn.Module):
         self.decoder = PSP(**decoder_cfg)
         self.disp_head1 = DispHead(input_dim=sam_dims[0])
 
-        self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
+        self.bcp = BCP(max_depth=max_depth, min_depth=min_depth, in_features = embed_dim)
 
         self.sg_encoder_q4 = SceneGraphEncoder(feat_dim=in_channels[3], node_dim=in_channels[3], out_dim=v_dims[3])
         self.sg_builder = SceneGraphBuilder(num_rel_classes = 51, iou_thresh=0.6)
