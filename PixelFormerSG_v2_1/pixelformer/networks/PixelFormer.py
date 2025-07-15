@@ -307,19 +307,21 @@ class SceneGraphBuilder(nn.Module):
         return results
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, feat_dim, hidden_dim, out_dim):
+    def __init__(self, feat_dim, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
         super().__init__()
         self.node_proj = nn.Sequential(
-            nn.Linear(feat_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim)
+            nn.Linear(feat_dim, node_dim),
+            nn.ReLU(inplace=True),
         )
+
+        self.roi_size = feat_size
+        self.relation_embed = nn.Embedding(rel_classes, node_dim)
         self.edge_proj = nn.Sequential(
-            nn.Linear(52, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim)
-        )
-        self.gnn = GATConv(hidden_dim, out_dim)
+                                nn.Linear(3 * node_dim, node_dim),
+                                nn.ReLU(inplace=True)
+                            )
+
+        self.gnn = GATConv(node_dim, out_dim)
 
     def xywh_to_xyxy(self, boxes):
         x_c, y_c, w, h = boxes.unbind(dim=-1)
@@ -347,10 +349,18 @@ class SceneGraphEncoder(nn.Module):
         roi_feats = roi_feats.view(roi_feats.size(0), -1)
 
         node_feats = self.node_proj(roi_feats)
-        edge_attr = self.edge_proj(batch.edge_attr)
+
+        # Extract edge features
+        subj_feat = node_feats[batch.edge_subj_idx]
+        obj_feat  = node_feats[batch.edge_obj_idx]
+        rel_embed = self.relation_embed(batch.edge_rel_type)
+
+        edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
+        edge_attr = self.edge_proj(edge_attr_input)  # [E, D]
+
         node_feats = self.gnn(node_feats, batch.edge_index, edge_attr)
 
-        return node_feats, batch.edge_index, edge_attr
+        return node_feats
 
 
 class PixelFormerSG(nn.Module):
@@ -425,8 +435,8 @@ class PixelFormerSG(nn.Module):
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         
         # scene graph encoder
-        self.sg_encoder_q4 = SceneGraphEncoder(feat_dim=in_channels[3], hidden_dim=in_channels[3], out_dim=v_dims[3])
-        self.sg_builder = SceneGraphBuilder(iou_threshold=0.6)
+        self.sg_encoder_q4 = SceneGraphEncoder(feat_dim=in_channels[3], node_dim=in_channels[3], out_dim=v_dims[3])
+        self.sg_builder = SceneGraphBuilder(iou_thresh=0.6)
         # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
         # self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
