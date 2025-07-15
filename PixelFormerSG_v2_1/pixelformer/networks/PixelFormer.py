@@ -351,12 +351,11 @@ class SceneGraphEncoder(nn.Module):
             rois[:, 0::2] *= W
             rois[:, 1::2] *= H
 
-            print("Number of boxes")
-            print(rois.shape)
-            print("Number of boxes----------")
-            roi_boxes = rois
-            print(roi_boxes.shape)
-            roi_feats = roi_align(feat_map, roi_boxes, output_size=self.roi_size, spatial_scale=1.0, aligned=True)
+            num_boxes = rois.size(0)
+            batch_idx = torch.zeros((num_boxes, 1), device=feat_map.device) 
+            roi_boxes = torch.cat([batch_idx, rois], dim=1)  # [N, 5]
+            
+            roi_feats = roi_align(feat_map[b].unsqueeze(0), roi_boxes, output_size=self.roi_size, spatial_scale=1.0, aligned=True)
             roi_feats = roi_feats.view(roi_feats.size(0), -1)
 
             node_feats = self.node_proj(roi_feats)
@@ -367,10 +366,6 @@ class SceneGraphEncoder(nn.Module):
             _, edge_rel_type = sg_data_list[b]["edge_attr"].softmax(-1)[:,:-1].max(-1)
             rel_embed = self.relation_embed(edge_rel_type)
 
-
-            print(subj_feat.shape)
-            print(obj_feat.shape)
-            print(rel_embed.shape)
             edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
             edge_attr = self.edge_proj(edge_attr_input)  # [E, D]
 
