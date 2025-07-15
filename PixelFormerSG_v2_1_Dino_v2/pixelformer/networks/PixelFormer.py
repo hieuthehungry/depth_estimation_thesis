@@ -428,7 +428,7 @@ class PixelFormerSG(nn.Module):
         self.combine_option = combine_option
         norm_cfg = dict(type='BN', requires_grad=True)
 
-        embed_dim = 512
+        embed_dim = 768
         in_channels = [768, 768, 768, 768]  # DINOv2-base out_channels for each selected block
 
         decoder_cfg = dict(
