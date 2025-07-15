@@ -123,11 +123,10 @@ def online_eval(model, dataloader_eval, gpu, ngpus, post_process=False):
                 # Flip image
 
                 # Flip scene graph bounding boxes
-                scene_graph_flipped = {
-                    'sub_boxes': flip_boxes_cxcywh(scene_graph['sub_boxes']),
-                    'obj_boxes': flip_boxes_cxcywh(scene_graph['obj_boxes']),
-                    'rel_logits': scene_graph['rel_logits']  # unchanged
-                }
+                scene_graph_flipped = scene_graph
+                scene_graph_flipped['sub_boxes'] = flip_boxes_cxcywh(scene_graph['sub_boxes']),
+                scene_graph_flipped['obj_boxes'] = flip_boxes_cxcywh(scene_graph['obj_boxes']),
+                
 
                 # Predict on flipped image and flipped scene graph
                 image_flipped = flip_lr(image)
