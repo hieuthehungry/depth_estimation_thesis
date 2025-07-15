@@ -504,11 +504,14 @@ class PixelFormerSG(nn.Module):
         
         # if self.combine_option == "plus":
         sg_feat_q4 = []
-        print(len(sg_feat_q4_list))
         for feat in sg_feat_q4_list:
-            print(feat.shape)
-            sg_feat_q4.append(feat.mean(dim=0))
-        sg_feat_q4 = torch.stack(sg_feat_q4, dim=0).unsqueeze(-1).unsqueeze(-1)
+            if feat.numel() == 0:  # Skip empty features
+                sg_feat_q4.append(torch.zeros(feat.shape[1], device=feat.device))
+            else:
+                sg_feat_q4.append(feat.mean(dim=0))
+
+        sg_feat_q4 = torch.stack(sg_feat_q4, dim=0).unsqueeze(-1).unsqueeze(-1)  # [B, C, 1, 1]
+
         q4 = q4 + sg_feat_q4
         # elif self.combine_option == "cross-attn":
         #     q4 = self.cross_attn_q4(q4, sg_feat_q4)
