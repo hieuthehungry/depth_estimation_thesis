@@ -298,7 +298,8 @@ class SAM(nn.Module):
         e_proj = e
         q_proj = q
 
-        Wh, Ww = q.size(2), q.size(3)
+        # Wh, Ww = q.size(2), q.size(3)
+        Wh, Ww = e.size(2), e.size(3)
         q = q.flatten(2).transpose(1, 2)
         e = e.flatten(2).transpose(1, 2)
 
