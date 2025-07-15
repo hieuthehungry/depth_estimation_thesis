@@ -445,8 +445,10 @@ class PixelFormerSG(nn.Module):
         self.backbone = DINOv2Backbone(model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11))
         v_dim = decoder_cfg['num_classes']*4
         win = 7
-        sam_dims = [128, 256, 512, 1024]
-        v_dims = [64, 128, 256, embed_dim]
+        # sam_dims = [128, 256, 512, 1024]
+        sam_dims = [768, 768, 768, 768]
+        v_dims = [768, 768, 768, 768] 
+        # v_dims = [64, 128, 256, embed_dim]
         self.sam4 = SAM(input_dim=in_channels[3], embed_dim=sam_dims[3], window_size=win, v_dim=v_dims[3], num_heads=32)
         self.sam3 = SAM(input_dim=in_channels[2], embed_dim=sam_dims[2], window_size=win, v_dim=v_dims[2], num_heads=16)
         self.sam2 = SAM(input_dim=in_channels[1], embed_dim=sam_dims[1], window_size=win, v_dim=v_dims[1], num_heads=8)
