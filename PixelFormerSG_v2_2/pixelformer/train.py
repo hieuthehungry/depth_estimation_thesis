@@ -324,6 +324,12 @@ def main_worker(gpu, ngpus_per_node, args):
                 mask = depth_gt > 1.0
 
             loss = silog_criterion.forward(depth_est, depth_gt, mask.to(torch.bool))
+            if torch.isnan(loss):
+                print("NaN detected in loss")
+                for name, param in model.named_parameters():
+                    if param.grad is not None and torch.isnan(param.grad).any():
+                        print(f"NaN in grad of {name}")
+                raise ValueError("NaN loss detected")
             loss.backward()
             for param_group in optimizer.param_groups:
                 current_lr = (args.learning_rate - end_learning_rate) * (1 - global_step / num_total_steps) ** 0.9 + end_learning_rate
