@@ -352,8 +352,8 @@ class SceneGraphEncoder(nn.Module):
 
         # Extract edge features
         print(batch.edge_index)
-        subj_feat = node_feats[batch.edge_index]
-        obj_feat  = node_feats[batch.edge_index]
+        subj_feat = node_feats[batch.edge_index[:,0]]
+        obj_feat  = node_feats[batch.edge_index[:,1]]
         rel_embed = self.relation_embed(batch.edge_rel_type)
 
         edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
