@@ -414,7 +414,7 @@ class DINOv2Backbone(nn.Module):
             feat = hidden_states[idx][:, 1:, :]  # remove CLS token
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
-            feat = feat.transpose(1, 2).reshape(B, C, out_h, out_w)
+            feat = feat.transpose(1, 2).contiguous().view(B, C, out_h, out_w)
             feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
             features.append(feat)
         return features
