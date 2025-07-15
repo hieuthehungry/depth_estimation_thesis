@@ -338,13 +338,15 @@ class SceneGraphEncoder(nn.Module):
         print(len(sg_data_list))
         print("-----------------")
         batch = Batch.from_data_list(sg_data_list)
-
+        print(batch.x.shape)
         # Convert box format before scaling
         rois = self.xywh_to_xyxy(batch.x)  # <- fix here
         rois[:, 0::2] *= W
         rois[:, 1::2] *= H
 
+        print("Number of boxes")
         print(rois.shape)
+        print("Number of boxes----------")
         roi_boxes = torch.cat([
             batch.batch.unsqueeze(1).float(), rois
         ], dim=1)  # [N, 5]
