@@ -183,6 +183,7 @@ class DataLoadPreprocess(Dataset):
                 depth_gt = depth_gt / 256.0
 
             if image.shape[0] != self.args.input_height or image.shape[1] != self.args.input_width:
+                print("Trúc xinh trúc mọc đầu đình")
                 image, depth_gt = self.random_crop(image, depth_gt, self.args.input_height, self.args.input_width)
             image, depth_gt = self.train_preprocess(image, depth_gt)
             sample = {'image': image, "scene_graph":  scene_graph, 'depth': depth_gt, 'focal': focal}
