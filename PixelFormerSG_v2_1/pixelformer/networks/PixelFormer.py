@@ -351,9 +351,9 @@ class SceneGraphEncoder(nn.Module):
         node_feats = self.node_proj(roi_feats)
 
         # Extract edge features
-        print(batch.edge_index)
-        subj_feat = node_feats[batch.edge_index[:,0]]
-        obj_feat  = node_feats[batch.edge_index[:,1]]
+        print(batch.edge_index.shape)
+        subj_feat = node_feats[batch.edge_index[0]]
+        obj_feat  = node_feats[batch.edge_index[1]]
         print(batch.edge_attr.shape)
         _, edge_rel_type = batch.edge_attr.softmax(-1)[:,:-1].max(-1)
         rel_embed = self.relation_embed(edge_rel_type)
