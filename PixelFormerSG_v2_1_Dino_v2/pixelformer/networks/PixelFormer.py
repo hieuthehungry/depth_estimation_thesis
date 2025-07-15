@@ -407,12 +407,15 @@ class DINOv2Backbone(nn.Module):
         hidden_states = outputs.hidden_states
 
         features = []
+        target_scales = [H // 4, H // 8, H // 16, H // 32]
+
         for i, idx in enumerate(self.out_indices):
             feat = hidden_states[idx][:, 1:, :]  # remove CLS token
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).reshape(B, C, out_h, out_w)
             feat = self.channel_projs[i](feat)
+            feat = F.interpolate(feat, size=(target_scales[i], target_scales[i]), mode='bilinear', align_corners=False)
             features.append(feat)
         return features
 
@@ -446,7 +449,7 @@ class PixelFormerSG(nn.Module):
         self.backbone = DINOv2Backbone(model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11), out_channels=in_channels)
         v_dim = decoder_cfg['num_classes']*4
         win = 7
-        sam_dims = in_channels
+        sam_dims = [128, 256, 512, 1024]
         v_dims = [64, 128, 256, embed_dim]
         self.sam4 = SAM(input_dim=in_channels[3], embed_dim=sam_dims[3], window_size=win, v_dim=v_dims[3], num_heads=32)
         self.sam3 = SAM(input_dim=in_channels[2], embed_dim=sam_dims[2], window_size=win, v_dim=v_dims[2], num_heads=16)
