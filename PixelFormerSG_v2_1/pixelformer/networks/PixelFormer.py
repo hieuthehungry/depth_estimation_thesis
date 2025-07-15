@@ -345,12 +345,9 @@ class SceneGraphEncoder(nn.Module):
 
     def forward(self, feat_map, sg_data_list):
         B, C, H, W = feat_map.shape
-        print("hihihi")
-        print(len(sg_data_list))
-        print("-----------------")
         outputs = []
         for b in range(B):
-            rois = self.xywh_to_xyxy(sg_data_list[b].node_boxes)  # <- fix here
+            rois = self.xywh_to_xyxy(sg_data_list[b]["node_boxes"])  # <- fix here
             rois[:, 0::2] *= W
             rois[:, 1::2] *= H
 
@@ -365,9 +362,9 @@ class SceneGraphEncoder(nn.Module):
             node_feats = self.node_proj(roi_feats)
 
             # Extract edge features
-            subj_feat = node_feats[sg_data_list[b].edge_index[0]]
-            obj_feat  = node_feats[sg_data_list[b].edge_index[1]]
-            _, edge_rel_type = sg_data_list[b].edge_attr.softmax(-1)[:,:-1].max(-1)
+            subj_feat = node_feats[sg_data_list[b]["edge_index"][0]]
+            obj_feat  = node_feats[sg_data_list[b]["edge_index"][1]]
+            _, edge_rel_type = sg_data_list[b]["edge_attr"].softmax(-1)[:,:-1].max(-1)
             rel_embed = self.relation_embed(edge_rel_type)
 
 
@@ -496,16 +493,7 @@ class PixelFormerSG(nn.Module):
 
         # 1. Scene graph features cho từng tầng
         graph_data_list = self.sg_builder(scene_graph)
-        graph_data_objs = [
-            Data(
-                x=graph['node_boxes'],
-                y=graph['node_labels'],
-                edge_index=graph['edge_index'],
-                edge_attr=graph['edge_attr']
-            )
-            for graph in graph_data_list
-        ]
-        sg_feat_q4 = self.sg_encoder_q4(enc_feats[3], graph_data_objs)
+        sg_feat_q4 = self.sg_encoder_q4(enc_feats[3], graph_data_list)
         # sg_feat_q3 = self.sg_encoder_q3(enc_feats[2], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
         # sg_feat_q2 = self.sg_encoder_q2(enc_feats[1], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
         # sg_feat_q1 = self.sg_encoder_q1(enc_feats[0], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
