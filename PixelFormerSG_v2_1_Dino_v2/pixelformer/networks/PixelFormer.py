@@ -407,7 +407,8 @@ class DINOv2Backbone(nn.Module):
         hidden_states = outputs.hidden_states
 
         features = []
-        target_scales = [H // 4, H // 8, H // 16, H // 32]
+
+        target_scales = [(H // 4, W // 4), (H // 8, W // 8), (H // 16, W // 16), (H // 32, W // 32)]
 
         for i, idx in enumerate(self.out_indices):
             feat = hidden_states[idx][:, 1:, :]  # remove CLS token
@@ -415,7 +416,7 @@ class DINOv2Backbone(nn.Module):
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).reshape(B, C, out_h, out_w)
             feat = self.channel_projs[i](feat)
-            feat = F.interpolate(feat, size=(target_scales[i], target_scales[i]), mode='bilinear', align_corners=False)
+            feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
             features.append(feat)
         return features
 
