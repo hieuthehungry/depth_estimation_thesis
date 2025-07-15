@@ -415,7 +415,7 @@ class DINOv2Backbone(nn.Module):
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).reshape(B, C, out_h, out_w)
-            feat = self.channel_projs[i](feat)
+            # feat = self.channel_projs[i](feat)
             feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
             features.append(feat)
         return features
@@ -434,8 +434,8 @@ class PixelFormerSG(nn.Module):
         norm_cfg = dict(type='BN', requires_grad=True)
 
         embed_dim = 512
-        in_channels = [128, 256, 512, 1024]  # updated channels after projection
-
+        # in_channels = [128, 256, 512, 1024]  # updated channels after projection
+        in_channels = [768, 768, 768, 768]
         decoder_cfg = dict(
             in_channels=in_channels,
             in_index=[0, 1, 2, 3],
