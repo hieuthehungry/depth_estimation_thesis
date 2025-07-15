@@ -488,7 +488,7 @@ class PixelFormerSG(nn.Module):
 
         q4 = self.decoder(enc_feats)
         sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)
-        q4 = q4 + sg_feat_q4
+        q4 = q4 + sg_feat_q4.contiguous()
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
