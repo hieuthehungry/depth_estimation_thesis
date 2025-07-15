@@ -373,8 +373,12 @@ class SceneGraphEncoder(nn.Module):
             edge_attr  = edge_attr.to(node_feats.device)
             node_feats = self.gnn(node_feats, edge_index, edge_attr)
             outputs.append(node_feats)
-        outputs = torch.stack(outputs, dim = 0)
-        print(outputs.shape)
+        max_nodes = max([x.size(0) for x in outputs])  # get the longest [N, D]
+        outputs_padded = [
+            F.pad(x, (0, 0, 0, max_nodes - x.size(0))) for x in outputs  # pad only along node dimension
+        ]
+        outputs = torch.stack(outputs_padded, dim = 0)
+        # print(outputs.shape)
         return outputs
 
 
