@@ -390,7 +390,7 @@ class DINOv2Backbone(nn.Module):
         super().__init__()
         self.backbone = Dinov2Model.from_pretrained(model_name, output_hidden_states=True)
         self.out_indices = out_indices
-        self.image_processor = AutoImageProcessor.from_pretrained(model_name)
+        # self.image_processor = AutoImageProcessor.from_pretrained(model_name)
 
         # hidden_size = self.backbone.config.hidden_size
         # self.channel_projs = nn.ModuleList([
@@ -414,7 +414,7 @@ class DINOv2Backbone(nn.Module):
             feat = hidden_states[idx][:, 1:, :]  # remove CLS token
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
-            feat = feat.reshape(B, C, out_h, out_w)
+            feat = feat.transpose(1, 2).reshape(B, C, out_h, out_w)
             feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
             features.append(feat)
         return features
