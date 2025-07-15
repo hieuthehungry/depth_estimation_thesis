@@ -348,43 +348,40 @@ class SceneGraphEncoder(nn.Module):
         print("hihihi")
         print(len(sg_data_list))
         print("-----------------")
-        batch = Batch.from_data_list(sg_data_list)
-        print(batch.x.shape)
-        # Convert box format before scaling
-        rois = self.xywh_to_xyxy(batch.x)  # <- fix here
-        rois[:, 0::2] *= W
-        rois[:, 1::2] *= H
+        outputs = []
+        for b in range(B):
+            rois = self.xywh_to_xyxy(sg_data_list[b].node_boxes)  # <- fix here
+            rois[:, 0::2] *= W
+            rois[:, 1::2] *= H
 
-        print("Number of boxes")
-        print(rois.shape)
-        print("Number of boxes----------")
-        roi_boxes = torch.cat([
-            batch.batch.unsqueeze(1).float(), rois
-        ], dim=1)  # [N, 5]
-        print(roi_boxes.shape)
-        roi_feats = roi_align(feat_map, roi_boxes, output_size=1, spatial_scale=1.0, aligned=True)
-        roi_feats = roi_feats.view(roi_feats.size(0), -1)
+            print("Number of boxes")
+            print(rois.shape)
+            print("Number of boxes----------")
+            roi_boxes = rois
+            print(roi_boxes.shape)
+            roi_feats = roi_align(feat_map, roi_boxes, output_size=1, spatial_scale=1.0, aligned=True)
+            roi_feats = roi_feats.view(roi_feats.size(0), -1)
 
-        node_feats = self.node_proj(roi_feats)
+            node_feats = self.node_proj(roi_feats)
 
-        # Extract edge features
-        print(batch.edge_index.shape)
-        subj_feat = node_feats[batch.edge_index[0]]
-        obj_feat  = node_feats[batch.edge_index[1]]
-        print(batch.edge_attr.shape)
-        _, edge_rel_type = batch.edge_attr.softmax(-1)[:,:-1].max(-1)
-        rel_embed = self.relation_embed(edge_rel_type)
+            # Extract edge features
+            subj_feat = node_feats[sg_data_list[b].edge_index[0]]
+            obj_feat  = node_feats[sg_data_list[b].edge_index[1]]
+            _, edge_rel_type = sg_data_list[b].edge_attr.softmax(-1)[:,:-1].max(-1)
+            rel_embed = self.relation_embed(edge_rel_type)
 
 
-        print(subj_feat.shape)
-        print(obj_feat.shape)
-        print(rel_embed.shape)
-        edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
-        edge_attr = self.edge_proj(edge_attr_input)  # [E, D]
+            print(subj_feat.shape)
+            print(obj_feat.shape)
+            print(rel_embed.shape)
+            edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
+            edge_attr = self.edge_proj(edge_attr_input)  # [E, D]
 
-        node_feats = self.gnn(node_feats, batch.edge_index, edge_attr)
-
-        return node_feats
+            node_feats = self.gnn(node_feats, sg_data_list[b].edge_index, edge_attr)
+            outputs.append(node_feats)
+        outputs = torch.stack(outputs, dim = 0)
+        print(outputs.shape)
+        return outputs
 
 
 class PixelFormerSG(nn.Module):
