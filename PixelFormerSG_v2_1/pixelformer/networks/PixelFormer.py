@@ -358,6 +358,10 @@ class SceneGraphEncoder(nn.Module):
         _, edge_rel_type = batch.edge_attr.softmax(-1)[:,:-1].max(-1)
         rel_embed = self.relation_embed(edge_rel_type)
 
+
+        print(subj_feat.shape)
+        print(obj_feat.shape)
+        print(rel_embed.shape)
         edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
         edge_attr = self.edge_proj(edge_attr_input)  # [E, D]
 
