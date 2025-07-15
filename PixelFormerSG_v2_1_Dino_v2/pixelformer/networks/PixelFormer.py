@@ -486,7 +486,8 @@ class PixelFormerSG(nn.Module):
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
-
+        print(enc_feats[2])
+        print(q3.shape)
         q2 = self.sam3(enc_feats[2], q3)
         q2 = nn.PixelShuffle(2)(q2)
 
