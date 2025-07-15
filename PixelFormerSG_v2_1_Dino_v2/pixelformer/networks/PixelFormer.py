@@ -386,7 +386,7 @@ import torch.nn as nn
 from transformers import AutoImageProcessor, Dinov2Model
 
 class DINOv2Backbone(nn.Module):
-    def __init__(self, model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11), out_channels=[128, 256, 512, 1024]):
+    def __init__(self, model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11)):
         super().__init__()
         self.backbone = Dinov2Model.from_pretrained(model_name, output_hidden_states=True)
         self.out_indices = out_indices
@@ -433,7 +433,7 @@ class PixelFormerSG(nn.Module):
         self.combine_option = combine_option
         norm_cfg = dict(type='BN', requires_grad=True)
 
-        embed_dim = 512
+        embed_dim = 768
         # in_channels = [128, 256, 512, 1024]  # updated channels after projection
         in_channels = [768, 768, 768, 768]
         decoder_cfg = dict(
@@ -526,55 +526,4 @@ def upsample(x, scale_factor=2, mode="bilinear", align_corners=False):
     """Upsample input tensor by a factor of 2
     """
     return F.interpolate(x, scale_factor=scale_factor, mode=mode, align_corners=align_corners)
-
-
-
-def build_obj_tokens(imgs, enc_feats, obj_logits, obj_boxes, obj_projector, top_k=16, output_size=(7,7)):
-    """
-    Extract top-k object tokens from encoder feature maps and object predictions.
-    Args:
-        imgs: input image batch (B,C,H,W)
-        enc_feats: encoder feature maps, assumed as a single tensor [B, C, H', W']
-        obj_logits: object class logits [B, num_queries, num_classes]
-        obj_boxes: normalized center-size boxes [B, num_queries, 4] (cx, cy, w, h)
-        obj_projector: nn.Module to project pooled features
-        top_k: number of top objects to use
-        output_size: spatial output size for ROIAlign
-    Returns:
-        obj_embeddings: projected object features [B, top_k, D_proj]
-    """
-    B, num_queries, num_classes = obj_logits.shape
-    device = obj_logits.device
-    H, W = imgs.shape[-2:]
-    obj_embeddings = []
-    for b in range(B):
-        # Get top-k indices per image
-        probs = F.softmax(obj_logits[b, :, :-1], dim=-1).max(dim=-1).values  # ignore no-object class
-        vals, inds = torch.topk(probs, k=top_k, dim=0)
-
-        # Get boxes
-        cx, cy, w, h = obj_boxes[b, inds].unbind(dim=1)
-        x1 = (cx - w/2) * W
-        y1 = (cy - h/2) * H
-        x2 = (cx + w/2) * W
-        y2 = (cy + h/2) * H
-        rois = torch.stack([x1, y1, x2, y2], dim=1)
-
-        # RoiAlign expects (image_idx, x1, y1, x2, y2)
-        img_inds = torch.full((rois.size(0),), b, device=device, dtype=torch.float32).unsqueeze(1)
-        rois_full = torch.cat([img_inds, rois], dim=1)
-
-        # Align features
-        pooled = roi_align(
-            enc_feats, rois_full, output_size=output_size, spatial_scale=enc_feats.size(-1)/float(H), aligned=True
-        )  # [top_k, C, output_size[0], output_size[1]]
-
-        # Average pool
-        pooled_mean = pooled.mean(dim=[2, 3])  # [top_k, C]
-
-        # Project
-        projected = obj_projector(pooled_mean)  # [top_k, D_proj]
-        obj_embeddings.append(projected)
-
-    return torch.stack(obj_embeddings, dim=0)  # [B, top_k, D_proj]
 
