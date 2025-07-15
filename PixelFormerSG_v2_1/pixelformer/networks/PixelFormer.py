@@ -334,6 +334,9 @@ class SceneGraphEncoder(nn.Module):
 
     def forward(self, feat_map, sg_data_list):
         B, C, H, W = feat_map.shape
+        print("hihihi")
+        print(len(sg_data_list))
+        print("-----------------")
         batch = Batch.from_data_list(sg_data_list)
 
         # Convert box format before scaling
@@ -341,10 +344,11 @@ class SceneGraphEncoder(nn.Module):
         rois[:, 0::2] *= W
         rois[:, 1::2] *= H
 
+        print(rois.shape)
         roi_boxes = torch.cat([
             batch.batch.unsqueeze(1).float(), rois
         ], dim=1)  # [N, 5]
-
+        print(roi_boxes.shape)
         roi_feats = roi_align(feat_map, roi_boxes, output_size=1, spatial_scale=1.0, aligned=True)
         roi_feats = roi_feats.view(roi_feats.size(0), -1)
 
