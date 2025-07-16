@@ -386,7 +386,7 @@ import torch.nn as nn
 from transformers import AutoImageProcessor, Dinov2Model
 
 class DINOv2Backbone(nn.Module):
-    def __init__(self, model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11)):
+    def __init__(self, model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11), out_channels = [128, 256, 512, 1024]):
         super().__init__()
         self.backbone = Dinov2Model.from_pretrained(model_name, output_hidden_states=True)
         self.out_indices = out_indices
@@ -395,7 +395,7 @@ class DINOv2Backbone(nn.Module):
         hidden_size = self.backbone.config.hidden_size
         self.channel_projs = nn.ModuleList([
             nn.Conv2d(hidden_size, out_ch, kernel_size=1)
-            for out_ch in [128, 256, 512, 1024]
+            for out_ch in out_channels
         ])
 
     def forward(self, x):
@@ -435,8 +435,9 @@ class PixelFormerSG(nn.Module):
         norm_cfg = dict(type='BN', requires_grad=True)
 
         embed_dim = 512
-        # in_channels = [128, 256, 512, 1024]  # updated channels after projection
-        in_channels = [768, 768, 768, 768]
+        in_channels = [128, 256, 512, 1024]  # updated channels after projection
+        # in_channels = [768, 768, 768, 768]
+        
         decoder_cfg = dict(
             in_channels=in_channels,
             in_index=[0, 1, 2, 3],
@@ -448,7 +449,7 @@ class PixelFormerSG(nn.Module):
             align_corners=False
         )
 
-        self.backbone = DINOv2Backbone(model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11))
+        self.backbone = DINOv2Backbone(model_name='facebook/dinov2-base', out_indices=(2, 5, 8, 11), out_channels= in_channels)
         v_dim = decoder_cfg['num_classes']*4
         win = 7
         sam_dims = [128, 256, 512, 1024]
