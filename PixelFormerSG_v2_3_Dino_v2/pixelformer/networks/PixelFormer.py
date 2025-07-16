@@ -398,14 +398,14 @@ class DINOv2Backbone(nn.Module):
             for out_ch in out_channels
         ])
 
-        H, W = 352, 1120
-        target_scales = [(H // 4, W // 4), (H // 8, W // 8), (H // 16, W // 16), (H // 32, W // 32)]
-        self.upsample_blocks = nn.ModuleList([
-            # nn.ConvTranspose2d(768, out_ch, kernel_size=2**(i+2), stride=2**(i+2))
-            # for i, out_ch in enumerate(out_channels)
-            nn.Upsample(size=target_scales[i], mode='bilinear', align_corners=False)
-            for i in range(len(target_scales))
-        ])
+        # H, W = 352, 1120
+        # target_scales = [(H // 4, W // 4), (H // 8, W // 8), (H // 16, W // 16), (H // 32, W // 32)]
+        # self.upsample_blocks = nn.ModuleList([
+        #     # nn.ConvTranspose2d(768, out_ch, kernel_size=2**(i+2), stride=2**(i+2))
+        #     # for i, out_ch in enumerate(out_channels)
+        #     # nn.Upsample(size=target_scales[i], mode='bilinear', align_corners=False)
+        #     for i in range(len(target_scales))
+        # ])
 
     def forward(self, x):
         B, _, H, W = x.shape
@@ -424,10 +424,11 @@ class DINOv2Backbone(nn.Module):
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).contiguous().view(B, C, out_h, out_w)
+            upsample = nn.Upsample(size=target_scales[i], mode='bilinear', align_corners=False)
             feat = self.channel_projs[i](feat)
 
             # feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
-            feat = self.upsample_blocks[i](feat)
+            feat = upsample(feat)
             print(feat.shape)
             features.append(feat)
         return features
