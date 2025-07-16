@@ -250,11 +250,11 @@ class DataLoadPreprocess(Dataset):
                 obj_boxes, obj_keep = adjust_boxes(scene_graph['obj_boxes'][b], crop_box, (H, W))
 
                 # You must apply this mask consistently to rel_logits, sub_logits, obj_logits too:
-                scene_graph['sub_boxes'] =  scene_graph['sub_boxes'][b][sub_keep & obj_keep].unsqueeze()
-                scene_graph['obj_boxes'] =  scene_graph['obj_boxes'][b][sub_keep & obj_keep].unsqueeze()
-                scene_graph['rel_logits'] = scene_graph['rel_logits'][b][sub_keep & obj_keep].unsqueeze()
-                scene_graph['sub_logits'] = scene_graph['sub_logits'][b][sub_keep & obj_keep].unsqueeze()
-                scene_graph['obj_logits'] = scene_graph['obj_logits'][b][sub_keep & obj_keep].unsqueeze()
+                scene_graph['sub_boxes'] =  scene_graph['sub_boxes'][b][sub_keep & obj_keep].unsqueeze(0)
+                scene_graph['obj_boxes'] =  scene_graph['obj_boxes'][b][sub_keep & obj_keep].unsqueeze(0)
+                scene_graph['rel_logits'] = scene_graph['rel_logits'][b][sub_keep & obj_keep].unsqueeze(0)
+                scene_graph['sub_logits'] = scene_graph['sub_logits'][b][sub_keep & obj_keep].unsqueeze(0)
+                scene_graph['obj_logits'] = scene_graph['obj_logits'][b][sub_keep & obj_keep].unsqueeze(0)
 
             image, depth_gt = self.train_preprocess(image, depth_gt, scene_graph)
             sample = {'image': image, "scene_graph":  scene_graph, 'depth': depth_gt, 'focal': focal}
