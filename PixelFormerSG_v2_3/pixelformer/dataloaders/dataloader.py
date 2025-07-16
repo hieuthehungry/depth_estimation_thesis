@@ -44,8 +44,15 @@ def collate_fn(batch):
         batched_scene_graphs = {'pred_logits': None, 'pred_boxes': None, 
                                 'sub_logits': None, 'sub_boxes': None, 'obj_logits': None, 
                                 'obj_boxes': None, 'rel_logits': None}
+        from torch.nn.functional import pad
+        
+        def pad_to_max(tensor_list):
+            max_len = max([t.shape[0] for t in tensor_list])
+            padded = [pad(t, (0, 0, 0, max_len - t.shape[0])) for t in tensor_list]
+            return torch.stack(padded)
         for key in batched_scene_graphs.keys():    
-            batched_scene_graphs[key] = torch.stack([sg[key].squeeze() for sg in scene_graphs])
+            batched_scene_graphs[key] = pad_to_max([sg[key].squeeze() for sg in scene_graphs])
+            # batched_scene_graphs[key] = [sg[key].squeeze() for sg in scene_graphs]
     else:
         batched_scene_graphs = scene_graphs[0]
     # Otherwise keep as list for your model's custom handling
@@ -250,6 +257,7 @@ class DataLoadPreprocess(Dataset):
                 obj_boxes, obj_keep = adjust_boxes(scene_graph['obj_boxes'][b], crop_box, (H, W))
 
                 # You must apply this mask consistently to rel_logits, sub_logits, obj_logits too:
+
                 scene_graph['sub_boxes'] =  scene_graph['sub_boxes'][b][sub_keep & obj_keep].unsqueeze(0)
                 scene_graph['obj_boxes'] =  scene_graph['obj_boxes'][b][sub_keep & obj_keep].unsqueeze(0)
                 scene_graph['rel_logits'] = scene_graph['rel_logits'][b][sub_keep & obj_keep].unsqueeze(0)
