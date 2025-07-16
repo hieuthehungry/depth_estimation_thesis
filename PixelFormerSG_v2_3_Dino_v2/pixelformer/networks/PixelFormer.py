@@ -393,10 +393,10 @@ class DINOv2Backbone(nn.Module):
         # self.image_processor = AutoImageProcessor.from_pretrained(model_name)
 
         hidden_size = self.backbone.config.hidden_size
-        # self.channel_projs = nn.ModuleList([
-        #     nn.Conv2d(hidden_size, out_ch, kernel_size=1)
-        #     for out_ch in out_channels
-        # ])
+        self.channel_projs = nn.ModuleList([
+            nn.Conv2d(hidden_size, out_ch, kernel_size=1)
+            for out_ch in out_channels
+        ])
 
         H, W = 352, 1120
         target_scales = [(H // 4, W // 4), (H // 8, W // 8), (H // 16, W // 16), (H // 32, W // 32)]
@@ -424,7 +424,7 @@ class DINOv2Backbone(nn.Module):
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).contiguous().view(B, C, out_h, out_w)
-            # feat = self.channel_projs[i](feat)
+            feat = self.channel_projs[i](feat)
 
             # feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
             feat = self.upsample_blocks[i](feat)
