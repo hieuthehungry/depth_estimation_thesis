@@ -417,7 +417,7 @@ class DINOv2Backbone(nn.Module):
             feat = feat.transpose(1, 2).contiguous().view(B, C, out_h, out_w)
             feat = self.channel_projs[i](feat)
 
-            # feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
+            feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
             features.append(feat)
         return features
 
