@@ -416,7 +416,7 @@ class DINOv2Backbone(nn.Module):
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).contiguous().view(B, C, out_h, out_w)
             feat = self.channel_projs[i](feat)
-
+            print(feat.shape)
             feat = F.interpolate(feat, size=target_scales[i], mode='nearest')
             features.append(feat)
         return features
