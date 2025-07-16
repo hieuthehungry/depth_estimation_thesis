@@ -428,6 +428,7 @@ class DINOv2Backbone(nn.Module):
 
             # feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
             feat = self.upsample_blocks[i](feat)
+            print(feat.shape)
             features.append(feat)
         return features
 
