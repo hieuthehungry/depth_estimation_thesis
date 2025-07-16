@@ -244,6 +244,7 @@ class DataLoadPreprocess(Dataset):
                 # print("Trúc xinh trúc mọc đầu đình")
                 H = self.args.input_height
                 W = self.args.input_width
+                b = 0
                 image, depth_gt, crop_box = self.random_crop(image, depth_gt, H, W)
                 sub_boxes, sub_keep = adjust_boxes(scene_graph['sub_boxes'][b], crop_box, (H, W))
                 obj_boxes, obj_keep = adjust_boxes(scene_graph['obj_boxes'][b], crop_box, (H, W))
