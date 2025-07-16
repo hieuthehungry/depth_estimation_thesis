@@ -250,8 +250,8 @@ class DataLoadPreprocess(Dataset):
                 obj_boxes, obj_keep = adjust_boxes(scene_graph['obj_boxes'][b], crop_box, (H, W))
 
                 # You must apply this mask consistently to rel_logits, sub_logits, obj_logits too:
-                scene_graph['sub_boxes'][b] = sub_boxes
-                scene_graph['obj_boxes'][b] = obj_boxes
+                scene_graph['sub_boxes'] = sub_boxes.unsqueeze(0)
+                scene_graph['obj_boxes'] = obj_boxes.unsqueeze(0)
                 scene_graph['rel_logits'][b] = scene_graph['rel_logits'][b][sub_keep & obj_keep]
                 scene_graph['sub_logits'][b] = scene_graph['sub_logits'][b][sub_keep & obj_keep]
                 scene_graph['obj_logits'][b] = scene_graph['obj_logits'][b][sub_keep & obj_keep]
