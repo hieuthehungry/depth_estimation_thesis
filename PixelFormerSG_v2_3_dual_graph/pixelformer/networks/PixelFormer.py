@@ -458,7 +458,7 @@ class PixelFormerSG(nn.Module):
         self.sg_builder = SceneGraphBuilder(num_rel_classes = 51, iou_thresh=0.6)
         # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
-        # self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
+        self.sg_encoder_q1 = SceneGraphEncoder(feat_dim=in_channels[0], node_dim=in_channels[0], out_dim=v_dims[0])
         
         # cross attention blocks
         # self.cross_attn_q4 = CrossAttnBlock(dim=v_dims[3], num_heads=8)
