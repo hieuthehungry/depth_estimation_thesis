@@ -347,10 +347,10 @@ class DINOv2Backbone(nn.Module):
             B, N, C = feat.shape
             assert N == out_h * out_w, f"Expected {out_h*out_w} patches but got {N}"
             feat = feat.transpose(1, 2).contiguous().view(B, C, out_h, out_w)
-            # upsample = nn.Upsample(size=target_scales[i], mode='bilinear', align_corners=False)
+            upsample = nn.Upsample(size=target_scales[i], mode='bilinear', align_corners=False)
             # feat = self.channel_projs[i](feat)
             # feat = F.interpolate(feat, size=target_scales[i], mode='bilinear', align_corners=False)
-            # feat = upsample(feat)
+            feat = upsample(feat)
             # print(feat.shape)
             features.append(feat)
         return features
@@ -400,6 +400,9 @@ class PixelFormerSG(nn.Module):
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
 
         self.sg_encoder_q4 = SceneGraphEncoder(feat_dim=in_channels[3], node_dim=in_channels[3], out_dim=v_dims[3])
+        self.sg_encoder_q3 = SceneGraphEncoder(feat_dim=in_channels[2], node_dim=in_channels[2], out_dim=v_dims[2])
+        self.sg_encoder_q2 = SceneGraphEncoder(feat_dim=in_channels[1], node_dim=in_channels[1], out_dim=v_dims[1])
+        self.sg_encoder_q1 = SceneGraphEncoder(feat_dim=in_channels[0], node_dim=in_channels[0], out_dim=v_dims[0])
         self.sg_builder = SceneGraphBuilder(num_rel_classes = 51, iou_thresh=0.6)
 
         self.up4 = nn.ConvTranspose2d(in_channels[3], v_dims[3], 2, 2)
@@ -420,23 +423,21 @@ class PixelFormerSG(nn.Module):
                 self.auxiliary_head.init_weights()
 
     def forward(self, imgs, scene_graph):
-        B, _, H, W = imgs.shape
-        target_scales = [(H // 4, W // 4), (H // 8, W // 8), (H // 16, W // 16), (H // 32, W // 32)]
         enc_feats = self.backbone(imgs)
         if self.with_neck:
             enc_feats = self.neck(enc_feats)
 
         graph_data_list = self.sg_builder(scene_graph)
         sg_feat_q4 = self.sg_encoder_q4(enc_feats[3], graph_data_list)
-        upsample = nn.Upsample(size=target_scales[-1], mode='bilinear', align_corners=False)
-        q4 = upsample(enc_feats[-1])
-        sg_feat_q4 = sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)
-        q4 = q4 + sg_feat_q4.contiguous()
+        sg_feat_q3 = self.sg_encoder_q4(enc_feats[2], graph_data_list)
+        sg_feat_q2 = self.sg_encoder_q4(enc_feats[1], graph_data_list)
+        sg_feat_q1 = self.sg_encoder_q4(enc_feats[0], graph_data_list)
+        
 
-        q3 = self.up4(q4) + enc_feats[3].mean(dim=1).unsqueeze(-1).unsqueeze(-1)
-        q2 = self.up2(q3) + enc_feats[2].mean(dim=1).unsqueeze(-1).unsqueeze(-1)
-        q1 = self.up1(q2) + enc_feats[1].mean(dim=1).unsqueeze(-1).unsqueeze(-1)
-        q0 = self.up1(q1) + enc_feats[0].mean(dim=1).unsqueeze(-1).unsqueeze(-1)
+        q3 = self.up4(q4 + sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)) 
+        q2 = self.up2(q3 + sg_feat_q3.mean(dim=1).unsqueeze(-1).unsqueeze(-1)) 
+        q1 = self.up1(q2+ sg_feat_q2.mean(dim=1).unsqueeze(-1).unsqueeze(-1))
+        q0 = self.up1(q1 + sg_feat_q1.mean(dim=1).unsqueeze(-1).unsqueeze(-1))
 
         bin_centers = self.bcp(q4)
         f = self.disp_head1(q0, bin_centers, 4)
