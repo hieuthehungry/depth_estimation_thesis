@@ -433,7 +433,7 @@ class PixelFormerSG(nn.Module):
         sg_feat_q2 = self.sg_encoder_q4(enc_feats[1], graph_data_list)
         sg_feat_q1 = self.sg_encoder_q4(enc_feats[0], graph_data_list)
         
-
+        q4 = enc_feats[-1]
         q3 = self.up4(q4 + sg_feat_q4.mean(dim=1).unsqueeze(-1).unsqueeze(-1)) 
         q2 = self.up2(q3 + sg_feat_q3.mean(dim=1).unsqueeze(-1).unsqueeze(-1)) 
         q1 = self.up1(q2+ sg_feat_q2.mean(dim=1).unsqueeze(-1).unsqueeze(-1))
