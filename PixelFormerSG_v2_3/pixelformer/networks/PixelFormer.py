@@ -244,7 +244,8 @@ class SceneGraphBuilder(nn.Module):
             probas_rel = rel_logits.softmax(-1)[:, :-1]
             probas_sub = sub_logits.softmax(-1)[:, :-1]
             probas_obj = obj_logits.softmax(-1)[:, :-1]
-    
+
+            # Only keep relation triplets where all elements' confidence >= 0.3
             keep = (probas_rel.max(-1).values > self.conf_thresh) & \
                    (probas_sub.max(-1).values > self.conf_thresh) & \
                    (probas_obj.max(-1).values > self.conf_thresh)
@@ -253,7 +254,8 @@ class SceneGraphBuilder(nn.Module):
             scores = probas_rel[keep_queries].max(-1)[0] * \
                      probas_sub[keep_queries].max(-1)[0] * \
                      probas_obj[keep_queries].max(-1)[0]
-    
+
+            # Get top 10 relation
             top_indices = torch.argsort(-scores)[:self.topk]
             keep_queries = keep_queries[top_indices]
     
@@ -272,7 +274,6 @@ class SceneGraphBuilder(nn.Module):
             # === IoU-based deduplication with label agreement ===
             boxes_xyxy = self.xywh_to_xyxy(boxes)
     
-            # === IoU-based deduplication with label agreement ===
             iou_matrix = box_iou(boxes_xyxy, boxes_xyxy)
             
             node_map = torch.arange(len(boxes))
@@ -350,7 +351,7 @@ class SceneGraphEncoder(nn.Module):
             rois = self.xywh_to_xyxy(sg_data_list[b]["node_boxes"])  # <- fix here
             rois[:, 0::2] *= W
             rois[:, 1::2] *= H
-
+            # Extract node features
             num_boxes = rois.size(0)
             batch_idx = torch.zeros((num_boxes, 1), device=feat_map.device) 
             roi_boxes = torch.cat([batch_idx, rois], dim=1)  # [N, 5]
@@ -373,12 +374,7 @@ class SceneGraphEncoder(nn.Module):
             edge_attr  = edge_attr.to(node_feats.device)
             node_feats = self.gnn(node_feats, edge_index, edge_attr)
             outputs.append(node_feats)
-        # max_nodes = max([x.size(0) for x in outputs])  # get the longest [N, D]
-        # outputs_padded = [
-        #     F.pad(x, (0, 0, 0, max_nodes - x.size(0))) for x in outputs  # pad only along node dimension
-        # ]
-        # outputs = torch.stack(outputs_padded, dim = 0)
-        # print(outputs.shape)
+
         return outputs
 
 
@@ -460,12 +456,6 @@ class PixelFormerSG(nn.Module):
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
         # self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
         
-        # cross attention blocks
-        # self.cross_attn_q4 = CrossAttnBlock(dim=v_dims[3], num_heads=8)
-        # self.cross_attn_q3 = CrossAttnBlock(dim=v_dims[2], num_heads=8)
-        # self.cross_attn_q2 = CrossAttnBlock(dim=v_dims[1], num_heads=4)
-        # self.cross_attn_q1 = CrossAttnBlock(dim=v_dims[0], num_heads=4)
-
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):
@@ -492,17 +482,11 @@ class PixelFormerSG(nn.Module):
             enc_feats = self.neck(enc_feats)
 
 
-        # 1. Scene graph features cho từng tầng
+        # 1. Scene graph feature extractor
         graph_data_list = self.sg_builder(scene_graph)
         sg_feat_q4_list = self.sg_encoder_q4(enc_feats[3], graph_data_list)
-        # sg_feat_q3 = self.sg_encoder_q3(enc_feats[2], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
-        # sg_feat_q2 = self.sg_encoder_q2(enc_feats[1], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
-        # sg_feat_q1 = self.sg_encoder_q1(enc_feats[0], scene_graph['sub_boxes'], scene_graph['obj_boxes'], scene_graph['rel_logits'])
-
-        # 2. Kết hợp với qX qua cross-attention (giả sử bạn có CrossAttnBlock sẵn)
         q4 = self.decoder(enc_feats)
         
-        # if self.combine_option == "plus":
         sg_feat_q4 = []
         for feat in sg_feat_q4_list:
             if feat.numel() == 0:  # Skip empty features
@@ -513,32 +497,18 @@ class PixelFormerSG(nn.Module):
         sg_feat_q4 = torch.stack(sg_feat_q4, dim=0).unsqueeze(-1).unsqueeze(-1)  # [B, C, 1, 1]
 
         q4 = q4 + sg_feat_q4
-        # elif self.combine_option == "cross-attn":
-        #     q4 = self.cross_attn_q4(q4, sg_feat_q4)
+     
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
-        # if self.combine_option == "plus":
-        #     sg_feat_q3 = sg_feat_q3.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
-        #     q3 = q3 + sg_feat_q3
-        # elif self.combine_option == "cross-attn":
-        #     q3 = self.cross_attn_q3(q3, sg_feat_q3)
-
+      
         q2 = self.sam3(enc_feats[2], q3)
         q2 = nn.PixelShuffle(2)(q2)
-        # if self.combine_option == "plus":
-        #     sg_feat_q2 = sg_feat_q2.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
-        #     q2 = q2 + sg_feat_q2
-        # elif self.combine_option == "cross-attn":
-        #     q2 = self.cross_attn_q2(q2, sg_feat_q2)
+
 
         q1 = self.sam2(enc_feats[1], q2)
         q1 = nn.PixelShuffle(2)(q1)
-        # if self.combine_option == "plus":
-        #     sg_feat_q1 = sg_feat_q1.mean(dim=1).unsqueeze(-1).unsqueeze(-1)  # [B, D, 1, 1]
-        #     q1 = q1 + sg_feat_q1
-        # elif self.combine_option == "cross-attn":
-        #     q1 = self.cross_attn_q1(q1, sg_feat_q1)
+
 
         q0 = self.sam1(enc_feats[0], q1)
         bin_centers = self.bcp(q4)
