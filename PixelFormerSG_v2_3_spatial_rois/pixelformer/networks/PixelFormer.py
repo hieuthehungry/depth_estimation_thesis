@@ -310,9 +310,11 @@ class SceneGraphEncoder(nn.Module):
 
             edge_index = sg_data_list[b]["edge_index"].to(node_feats.device)
             enhanced_nodes = self.gnn(node_feats, edge_index, edge_attr)
+            print(enhanced_nodes.shape)
 
             for i in range(num_boxes):
                 x1, y1, x2, y2 = rois[i].long()
+                print(x1, y1, x2, y2)
                 h, w = y2 - y1, x2 - x1
                 roi_patch = enhanced_nodes[i].view(1, -1, 1, 1)
                 upsampled = F.interpolate(roi_patch, size=(h, w), mode='bilinear', align_corners=False)
