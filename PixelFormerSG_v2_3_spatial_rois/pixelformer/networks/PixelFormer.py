@@ -437,7 +437,7 @@ class PixelFormerSG(nn.Module):
         # sg_feat_q4 = torch.stack(sg_feat_q4, dim=0).unsqueeze(-1).unsqueeze(-1)  # [B, C, 1, 1]
         # q4 = q4 + sg_feat_q4
 
-        sg_feat_map = self.sg_encoder(enc_feats[3], graph_data_list)
+        sg_feat_map = self.sg_encoder_q4(enc_feats[3], graph_data_list)
         q4 = q4 + sg_feat_map
 
      
