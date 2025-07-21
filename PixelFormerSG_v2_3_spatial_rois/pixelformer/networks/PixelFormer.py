@@ -277,7 +277,7 @@ class SceneGraphEncoder(nn.Module):
         return torch.stack([x1, y1, x2, y2], dim=-1)  # [B, T, 4]
         
 
-def forward(self, feat_map, sg_data_list):
+    def forward(self, feat_map, sg_data_list):
         B, _, H, W = feat_map.shape
         spatial_rois = torch.zeros(B, self.gnn.out_channels, H, W, device=feat_map.device)
 
