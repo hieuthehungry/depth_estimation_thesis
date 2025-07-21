@@ -242,8 +242,12 @@ class SceneGraphBuilder(nn.Module):
 class SceneGraphEncoder(nn.Module):
     def __init__(self, feat_dim, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
         super().__init__()
+        # self.node_proj = nn.Sequential(
+        #     nn.Linear(feat_dim, node_dim),
+        #     nn.ReLU(inplace=True),
+        # )
         self.node_proj = nn.Sequential(
-            nn.Linear(feat_dim, node_dim),
+            nn.Conv2d(feat_dim, node_dim, kernel_size=1),
             nn.ReLU(inplace=True),
         )
 
