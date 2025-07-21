@@ -316,6 +316,7 @@ class SceneGraphEncoder(nn.Module):
                 x1, y1, x2, y2 = rois[i].long()
                 print(x1, y1, x2, y2)
                 h, w = y2 - y1, x2 - x1
+                print("H, W: ", h, w)
                 roi_patch = enhanced_nodes[i].view(1, -1, 1, 1)
                 upsampled = F.interpolate(roi_patch, size=(h, w), mode='bilinear', align_corners=False)
                 spatial_rois[b, :, y1:y2, x1:x2] += upsampled.squeeze(0)
