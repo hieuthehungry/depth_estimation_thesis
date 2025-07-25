@@ -140,6 +140,11 @@ from torchvision.ops import box_iou, roi_align
 from torch_geometric.data import Data, Batch
 from torch_geometric.nn import GATConv
 
+USED_OBJECT_CLASSES = [136, 76, 73, 65, 138, 99, 105, 26, 22, 124, 145, 137, 144, 91, 80, 115, 38, 97, 130, 75, 114, 45, 146, 134, 23, 10,
+                        135, 11, 78, 111, 63, 62, 87, 48, 104, 101, 149, 67, 59, 72, 121, 103, 61, 60, 66, 19, 100, 35, 93, 9, 113, 57, 77, 
+                        127, 95, 117, 4, 47, 108, 21, 148, 90, 96, 3, 139, 126, 30, 16, 12, 6, 58, 28, 37, 54, 44, 74, 140, 112]
+
+USED_RELATION_CLASSES = [20, 31, 8, 51, 35, 29, 30, 38, 23, 4, 21, 22, 48, 50, 42, 46, 11, 3, 1, 7, 16, 40, 33, 19]
 
 class SceneGraphBuilder(nn.Module):
     def __init__(self, num_rel_classes, topk=10, conf_thresh=0.3, iou_thresh=0.6):
@@ -160,99 +165,119 @@ class SceneGraphBuilder(nn.Module):
 
 
     def forward(self, scene_graph):
-        """
-        scene_graph: dict with keys: sub_boxes, obj_boxes, sub_logits, obj_logits, rel_logits
-        Returns:
-            node_boxes [N, 4], node_labels [N], edge_index [2, K], edge_attr [K, R+1]
-        """
         results = []
         B = scene_graph['rel_logits'].size(0)
 
         for b in range(B):
             rel_logits = scene_graph['rel_logits'][b]        # [N, R+1]
             sub_logits = scene_graph['sub_logits'][b]        # [N, C+1]
-            obj_logits = scene_graph['obj_logits'][b]
-    
+            obj_logits = scene_graph['obj_logits'][b]        # [N, C+1]
+
             probas_rel = rel_logits.softmax(-1)[:, :-1]
             probas_sub = sub_logits.softmax(-1)[:, :-1]
             probas_obj = obj_logits.softmax(-1)[:, :-1]
 
-            # Only keep relation triplets where all elements' confidence >= 0.3
             keep = (probas_rel.max(-1).values > self.conf_thresh) & \
-                   (probas_sub.max(-1).values > self.conf_thresh) & \
-                   (probas_obj.max(-1).values > self.conf_thresh)
-    
+                (probas_sub.max(-1).values > self.conf_thresh) & \
+                (probas_obj.max(-1).values > self.conf_thresh)
+
             keep_queries = torch.nonzero(keep, as_tuple=True)[0]
             scores = probas_rel[keep_queries].max(-1)[0] * \
-                     probas_sub[keep_queries].max(-1)[0] * \
-                     probas_obj[keep_queries].max(-1)[0]
+                    probas_sub[keep_queries].max(-1)[0] * \
+                    probas_obj[keep_queries].max(-1)[0]
 
-            # Get top 10 relation
             top_indices = torch.argsort(-scores)[:self.topk]
             keep_queries = keep_queries[top_indices]
-    
-            sub_boxes = scene_graph['sub_boxes'][b][keep_queries]  # [K, 4]
-            obj_boxes = scene_graph['obj_boxes'][b][keep_queries]  # [K, 4]
-            sub_labels = sub_logits[keep_queries, :-1].argmax(-1)  # [K]
-            obj_labels = obj_logits[keep_queries, :-1].argmax(-1)  # [K]
-            rel_feats = rel_logits[keep_queries]                   # [K, R+1]
-    
+
+            sub_boxes = scene_graph['sub_boxes'][b][keep_queries]
+            obj_boxes = scene_graph['obj_boxes'][b][keep_queries]
+            sub_logits_keep = sub_logits[keep_queries, :-1]
+            obj_logits_keep = obj_logits[keep_queries, :-1]
+            rel_feats = rel_logits[keep_queries]
+
+            # Optional: use class labels too
+            sub_labels = sub_logits_keep.argmax(-1)
+            obj_labels = obj_logits_keep.argmax(-1)
+
             num_rels = sub_boxes.size(0)
-    
-            # === Merge subject and object boxes ===
-            boxes = torch.cat([sub_boxes, obj_boxes], dim=0)       # [2K, 4]
-            labels = torch.cat([sub_labels, obj_labels], dim=0)    # [2K]
-    
-            # === IoU-based deduplication with label agreement ===
+
+            # Merge
+            boxes = torch.cat([sub_boxes, obj_boxes], dim=0)
+            labels = torch.cat([sub_labels, obj_labels], dim=0)
+            logits = torch.cat([sub_logits_keep, obj_logits_keep], dim=0)  # [2K, C]
+
             boxes_xyxy = self.xywh_to_xyxy(boxes)
-    
             iou_matrix = box_iou(boxes_xyxy, boxes_xyxy)
-            
+
             node_map = torch.arange(len(boxes))
             for i in range(len(boxes)):
                 for j in range(i):
                     if labels[i] == labels[j] and iou_matrix[i, j] >= self.iou_thresh:
                         node_map[i] = node_map[j]
-    
+
             _, unique_indices = torch.unique(node_map, return_inverse=True)
             dedup_boxes = []
             dedup_labels = []
+            dedup_logits = []
             seen = {}
+
             for i, new_idx in enumerate(unique_indices):
                 if new_idx.item() not in seen:
                     dedup_boxes.append(boxes[i])
                     dedup_labels.append(labels[i])
+                    dedup_logits.append(logits[i])
                     seen[new_idx.item()] = True
-    
+
             node_boxes = torch.stack(dedup_boxes) if dedup_boxes else boxes
             node_labels = torch.stack(dedup_labels) if dedup_labels else labels
-    
+            node_attr   = torch.stack(dedup_logits) if dedup_logits else logits  # [N, C]
+
             subj_ids = unique_indices[:num_rels]
             obj_ids = unique_indices[num_rels:]
-            edge_index = torch.stack([subj_ids, obj_ids], dim=0)  # [2, K]
-            
+            edge_index = torch.stack([subj_ids, obj_ids], dim=0)
+
             results.append({
-                'node_boxes': node_boxes,        # [N, 4] in xywh
-                'node_labels': node_labels,      # [N] - class indices 0-151
-                'edge_index': edge_index,        # [2, K]
-                'edge_attr': rel_feats           # [K, R+1]
+                'node_boxes': node_boxes,     # [N, 4]
+                'node_labels': node_labels,   # [N]
+                'node_attr': node_attr,       # [N, C] <-- your logits
+                'edge_index': edge_index,     # [2, K]
+                'edge_attr': rel_feats        # [K, R+1]
             })
+
         return results
 
 class SceneGraphEncoder(nn.Module):
-    def __init__(self, feat_dim, node_dim, out_dim, rel_classes=51, feat_size=(7, 7)):
+    def __init__(self, node_dim, out_dim, rel_classes=51, obj_classes = 151, feat_size=(7, 7)):
         super().__init__()
         self.node_proj = nn.Sequential(
-            nn.Linear(feat_dim, node_dim),
+            nn.Linear(node_dim*2, node_dim),
             nn.ReLU(inplace=True),
         )
 
         self.roi_size = feat_size
-        self.relation_embed = nn.Embedding(rel_classes, node_dim)
+
         self.edge_proj = nn.Sequential(
                                 nn.Linear(3 * node_dim, node_dim),
                                 nn.ReLU(inplace=True)
                             )
+        
+        # Relation mapping
+        self.used_relation_ids = sorted(USED_RELATION_CLASSES)
+
+        rel_id_map = torch.full((rel_classes + 1,), -1, dtype=torch.long)  # +1 to account for background
+        for new_idx, raw_id in enumerate(self.used_relation_ids):
+            rel_id_map[raw_id] = new_idx
+        self.register_buffer("rel_id_map_buffer", rel_id_map)
+        self.relation_embed = nn.Embedding(len(self.used_relation_ids), node_dim)
+
+
+        # object type mapping
+        self.used_obj_ids = sorted(USED_OBJECT_CLASSES)
+        obj_map = torch.full((obj_classes + 1,), -1, dtype=torch.long)
+        for new_idx, raw_id in enumerate(self.used_obj_ids):
+            obj_map[raw_id] = new_idx
+        self.register_buffer("obj_id_map_buffer", obj_map)
+        self.node_embed = nn.Embedding(len(self.used_obj_ids), node_dim)
 
         self.gnn = GATConv(node_dim, out_dim)
 
@@ -291,13 +316,35 @@ class SceneGraphEncoder(nn.Module):
             roi_feats = roi_align(feat_map[b].unsqueeze(0), roi_boxes, output_size=self.roi_size, spatial_scale=1.0, aligned=True)
             roi_feats = roi_feats.mean(dim=[2, 3])  # global average pooling → [N, C]
 
-            node_feats = self.node_proj(roi_feats)
+            # _, node_type = sg_data_list[b]["node_attr"].softmax(-1)[:,:-1].max(-1)
+            _, raw_node_type = sg_data_list[b]["node_attr"].softmax(-1)[:, :-1].max(-1)  # [N]
+            mapped_node_type = self.obj_id_map_buffer[raw_node_type]                     # [N]
+
+            # Filter out invalid (-1) node classes
+            valid_node_mask = mapped_node_type != -1
+            roi_feats = roi_feats[valid_node_mask]
+            mapped_node_type = mapped_node_type[valid_node_mask]
+            
+            node_emb = self.node_embed(mapped_node_type)
+            node_attr_input = torch.cat([node_emb, roi_feats], dim=-1)
+            node_feats = self.node_proj(node_attr_input)  # [E, D]
+
 
             # Extract edge features
             subj_feat = node_feats[sg_data_list[b]["edge_index"][0]]
             obj_feat  = node_feats[sg_data_list[b]["edge_index"][1]]
-            _, edge_rel_type = sg_data_list[b]["edge_attr"].softmax(-1)[:,:-1].max(-1)
-            rel_embed = self.relation_embed(edge_rel_type)
+            # _, edge_rel_type = sg_data_list[b]["edge_attr"].softmax(-1)[:,:-1].max(-1)
+            # rel_embed = self.relation_embed(edge_rel_type)
+            _, raw_rel_type = sg_data_list[b]["edge_attr"].softmax(-1)[:, :-1].max(-1)  # [K]
+            mapped_rel_type = self.rel_id_map_buffer[raw_rel_type]  # [K]
+
+            # Filter out invalid (unseen) relation types
+            valid_mask = mapped_rel_type != -1
+            mapped_rel_type = mapped_rel_type[valid_mask]
+            subj_feat = subj_feat[valid_mask]
+            obj_feat  = obj_feat[valid_mask]
+
+            rel_embed = self.relation_embed(mapped_rel_type)
 
             edge_attr_input = torch.cat([subj_feat, obj_feat, rel_embed], dim=-1)
             edge_attr = self.edge_proj(edge_attr_input)  # [E, D]
@@ -382,7 +429,7 @@ class PixelFormerSG(nn.Module):
         self.bcp = BCP(max_depth=max_depth, min_depth=min_depth)
         
         # scene graph encoder
-        self.sg_encoder_q4 = SceneGraphEncoder(feat_dim=in_channels[3], node_dim=in_channels[3], out_dim=v_dims[3])
+        self.sg_encoder_q4 = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
         self.sg_builder = SceneGraphBuilder(num_rel_classes = 51, iou_thresh=0.6)
         # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
