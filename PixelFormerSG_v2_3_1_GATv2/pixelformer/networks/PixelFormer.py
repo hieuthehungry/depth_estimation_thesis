@@ -257,7 +257,7 @@ class SceneGraphEncoder(nn.Module):
                                 nn.ReLU(inplace=True)
                             )
 
-        self.gnn = GATv2Conv(node_dim, out_dim)
+        self.gnn = GATv2Conv(node_dim, out_dim, edge_dim = node_dim)
 
     def xywh_to_xyxy(self, boxes):
         """
