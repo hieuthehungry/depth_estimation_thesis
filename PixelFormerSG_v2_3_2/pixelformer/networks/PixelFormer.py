@@ -263,21 +263,24 @@ class SceneGraphEncoder(nn.Module):
         
         # Relation mapping
         self.used_relation_ids = sorted(USED_RELATION_CLASSES)
-
-        rel_id_map = torch.full((rel_classes + 1,), -1, dtype=torch.long)  # +1 to account for background
+        unknown_rel_index = len(self.used_relation_ids)
+        rel_id_map = torch.full((rel_classes + 1,), unknown_rel_index, dtype=torch.long)  # +1 to account for background
         for new_idx, raw_id in enumerate(self.used_relation_ids):
             rel_id_map[raw_id] = new_idx
         self.register_buffer("rel_id_map_buffer", rel_id_map)
-        self.relation_embed = nn.Embedding(len(self.used_relation_ids), node_dim)
+        self.relation_embed = nn.Embedding(len(self.used_relation_ids) + 1, node_dim)
+       
+        
 
 
         # object type mapping
         self.used_obj_ids = sorted(USED_OBJECT_CLASSES)
-        obj_map = torch.full((obj_classes + 1,), -1, dtype=torch.long)
+        unknown_obj_index = len(self.used_obj_ids)
+        obj_map = torch.full((obj_classes + 1,), unknown_obj_index, dtype=torch.long)
         for new_idx, raw_id in enumerate(self.used_obj_ids):
             obj_map[raw_id] = new_idx
         self.register_buffer("obj_id_map_buffer", obj_map)
-        self.node_embed = nn.Embedding(len(self.used_obj_ids), node_dim)
+        self.node_embed = nn.Embedding(len(self.used_obj_ids) + 1, node_dim)
 
         self.gnn = GATConv(node_dim, out_dim)
 
