@@ -392,7 +392,7 @@ class PixelFormerSG(nn.Module):
         # scene graph encoder
         self.sg_encoder_q4 = SceneGraphEncoder(node_dim=in_channels[3], out_dim=v_dims[3])
         self.sg_builder = SceneGraphBuilder(num_rel_classes = 51, iou_thresh=0.6)
-        self.conv_q4 = nn.Conv2d(v_dims[3], in_channels[3], 1)
+        self.conv_q4 = nn.Conv2d(in_channels[3]*2, in_channels[3], 1)
         # self.sg_encoder_q3 = SceneGraphEncoder(node_dim=in_channels[2], out_dim=v_dims[2])
         # self.sg_encoder_q2 = SceneGraphEncoder(node_dim=in_channels[1], out_dim=v_dims[1])
         # self.sg_encoder_q1 = SceneGraphEncoder(node_dim=in_channels[0], out_dim=v_dims[0])
@@ -438,7 +438,7 @@ class PixelFormerSG(nn.Module):
         sg_feat_q4 = torch.stack(sg_feat_q4, dim=0).unsqueeze(-1).unsqueeze(-1)  # [B, C, 1, 1]
 
         # q4 = q4 + sg_feat_q4
-        # print(q4.shape)
+        print(q4.shape)
         q4 = torch.cat([q4, sg_feat_q4.expand(-1, -1, q4.shape[2], q4.shape[3])], dim = 1)
         print(q4.shape)
         q4 = self.conv_q4(q4)
