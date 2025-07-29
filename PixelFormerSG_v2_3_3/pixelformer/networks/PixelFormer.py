@@ -438,9 +438,9 @@ class PixelFormerSG(nn.Module):
         sg_feat_q4 = torch.stack(sg_feat_q4, dim=0).unsqueeze(-1).unsqueeze(-1)  # [B, C, 1, 1]
 
         # q4 = q4 + sg_feat_q4
-        print(q4.shape)
+        # print(q4.shape)
         q4 = torch.cat([q4, sg_feat_q4.expand(-1, -1, q4.shape[2], q4.shape[3])], dim = 1)
-        print(q4.shape)
+        # print(q4.shape)
         q4 = self.conv_q4(q4)
 
         q3 = self.sam4(enc_feats[3], q4)
