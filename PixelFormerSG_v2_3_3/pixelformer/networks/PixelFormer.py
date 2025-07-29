@@ -440,7 +440,7 @@ class PixelFormerSG(nn.Module):
         # q4 = q4 + sg_feat_q4
         # print(q4.shape)
         q4 = torch.cat([q4, sg_feat_q4.expand(-1, -1, q4.shape[2], q4.shape[3])], dim = 0)
-     
+        q4 = self.conv_q4(q4)
 
         q3 = self.sam4(enc_feats[3], q4)
         q3 = nn.PixelShuffle(2)(q3)
