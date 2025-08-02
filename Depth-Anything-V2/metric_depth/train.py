@@ -89,6 +89,7 @@ def main():
     
     if "latest" in args.pretrained_from:
         checkpoint = torch.load(args.pretrained_from)
+        checkpoint["model"] = {k.replace("module.", "", 1): v for k, v in checkpoint["model"].items()}
         model.load_state_dict(checkpoint["model"])
     elif args.pretrained_from:
         checkpoint = None
