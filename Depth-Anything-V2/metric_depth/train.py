@@ -111,10 +111,11 @@ def main():
     
     start_epoch = 0
     previous_best = {'d1': 0, 'd2': 0, 'd3': 0, 'abs_rel': 100, 'sq_rel': 100, 'rmse': 100, 'rmse_log': 100, 'log10': 100, 'silog': 100}
-    if "optimizer" in checkpoint.keys():
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        start_epoch = checkpoint["epoch"]
-        previous_best = checkpoint["previous_best"]
+    if checkpoint is not None:
+        if "optimizer" in checkpoint.keys():
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            start_epoch = checkpoint["epoch"]
+            previous_best = checkpoint["previous_best"]
     total_iters = args.epochs * len(trainloader)
     
     
