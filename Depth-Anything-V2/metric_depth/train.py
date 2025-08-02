@@ -22,7 +22,7 @@ from util.dist_helper import setup_distributed
 from util.loss import SiLogLoss
 from util.metric import eval_depth
 from util.utils import init_log
-
+from glob import glob
 
 parser = argparse.ArgumentParser(description='Depth Anything V2 for Metric Depth Estimation')
 
@@ -207,6 +207,20 @@ def main():
             for name, metric in results.items():
                 writer.add_scalar(f'eval/{name}', (metric / nsamples).item(), epoch)
         
+        if results["silog"]/nsamples < previous_best["silog"]:
+            checkpoint = {
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'epoch': epoch,
+                'previous_best': previous_best,
+            }
+            old_best_model_path = glob(os.path.join(args.save_path, f'model_epoch_*_silog_*.pth'))
+            for path in old_best_model_path:
+                if os.path.exists(path):
+                    print(f"Removing old best model {path}")
+                    command = 'rm {}'.format(path)
+                    os.system(command)
+            torch.save(checkpoint, os.path.join(args.save_path, f'model_epoch_{epoch}_silog_{results['silog']/nsamples:.5f}.pth'))
         for k in results.keys():
             if k in ['d1', 'd2', 'd3']:
                 previous_best[k] = max(previous_best[k], (results[k] / nsamples).item())
