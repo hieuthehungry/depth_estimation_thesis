@@ -220,7 +220,7 @@ def main():
                     print(f"Removing old best model {path}")
                     command = 'rm {}'.format(path)
                     os.system(command)
-            torch.save(checkpoint, os.path.join(args.save_path, f'model_epoch_{epoch}_silog_{results['silog']/nsamples:.5f}.pth'))
+            torch.save(checkpoint, os.path.join(args.save_path, f"model_epoch_{epoch}_silog_{results['silog']/nsamples:.5f}.pth"))
         for k in results.keys():
             if k in ['d1', 'd2', 'd3']:
                 previous_best[k] = max(previous_best[k], (results[k] / nsamples).item())
