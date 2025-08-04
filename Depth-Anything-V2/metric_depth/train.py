@@ -121,14 +121,15 @@ def main():
     
     
     for epoch in range(start_epoch, args.epochs):
+        
         if rank == 0:
             logger.info('===========> Epoch: {:}/{:}, d1: {:.3f}, d2: {:.3f}, d3: {:.3f}'.format(epoch, args.epochs, previous_best['d1'], previous_best['d2'], previous_best['d3']))
             logger.info('===========> Epoch: {:}/{:}, abs_rel: {:.3f}, sq_rel: {:.3f}, rmse: {:.3f}, rmse_log: {:.3f}, '
                         'log10: {:.3f}, silog: {:.3f}'.format(
                             epoch, args.epochs, previous_best['abs_rel'], previous_best['sq_rel'], previous_best['rmse'], 
                             previous_best['rmse_log'], previous_best['log10'], previous_best['silog']))
-        
-        trainloader.sampler.set_epoch(epoch + 1)
+        epoch = epoch + 1
+        trainloader.sampler.set_epoch(epoch)
         
         model.train()
         total_loss = 0
@@ -207,7 +208,7 @@ def main():
             for name, metric in results.items():
                 writer.add_scalar(f'eval/{name}', (metric / nsamples).item(), epoch)
         
-        if results["silog"]/nsamples < previous_best["silog"]:
+        if results["silog"] < previous_best["silog"]:
             checkpoint = {
                 'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
