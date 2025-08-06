@@ -65,6 +65,7 @@ def main():
         trainset = VKITTI2('dataset/splits/vkitti2/train.txt', 'train', size=size)
     elif args.dataset == 'kitti':
         trainset = KITTI('dataset/splits/kitti/train.txt', 'train', size=size)
+        print(len(trainset))
     else:
         raise NotImplementedError
     trainsampler = torch.utils.data.distributed.DistributedSampler(trainset)
@@ -121,6 +122,7 @@ def main():
             start_epoch = checkpoint["epoch"]
             previous_best = checkpoint["previous_best"]
     total_iters = args.epochs * len(trainloader)
+    print(len(trainloader))
     
     
     
