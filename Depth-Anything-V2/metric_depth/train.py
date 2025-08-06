@@ -63,6 +63,8 @@ def main():
         trainset = Hypersim('dataset/splits/hypersim/train.txt', 'train', size=size)
     elif args.dataset == 'vkitti':
         trainset = VKITTI2('dataset/splits/vkitti2/train.txt', 'train', size=size)
+    elif args.dataset == 'kitti':
+        trainset = KITTI('dataset/splits/kitti/train.txt', 'train', size=size)
     else:
         raise NotImplementedError
     trainsampler = torch.utils.data.distributed.DistributedSampler(trainset)
@@ -71,6 +73,8 @@ def main():
     if args.dataset == 'hypersim':
         valset = Hypersim('dataset/splits/hypersim/val.txt', 'val', size=size)
     elif args.dataset == 'vkitti':
+        valset = KITTI('dataset/splits/kitti/val.txt', 'val', size=size)
+    elif args.dataset == 'kitti':
         valset = KITTI('dataset/splits/kitti/val.txt', 'val', size=size)
     else:
         raise NotImplementedError
