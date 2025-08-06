@@ -8,8 +8,8 @@ from dataset.transform import Resize, NormalizeImage, PrepareForNet
 
 class KITTI(Dataset):
     def __init__(self, filelist_path, mode, size=(518, 518)):
-        if mode != 'val':
-            raise NotImplementedError
+        # if mode != 'val':
+        #     raise NotImplementedError
         
         self.mode = mode
         self.size = size
