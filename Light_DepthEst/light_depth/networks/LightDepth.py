@@ -380,7 +380,7 @@ class MLPFusion(nn.Module):
 # ---------------------------
 # Full model that ties everything
 # ---------------------------
-class DepthSceneGATModel(nn.Module):
+class LightDepth(nn.Module):
     def __init__(self, encoder = 'mobilenetv3_small_100', yolo_weights=None, fusion_method= "perceiver", decoder_channels=256, roi_size = (7,7), num_classes = 80, node_dim = 256, relation_dim = 128, max_objects = 16, device="cuda"):
         super().__init__()
         self.device = device
