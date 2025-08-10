@@ -203,7 +203,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.rank = args.rank * ngpus_per_node + gpu
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank)
 
-    model = LightDepth(encoder = args.encoder, yolo_weights=args.yolo_weight, fusion_method= args.fusion_model, 
+    model = LightDepth(encoder = args.encoder, yolo_weights=args.yolo_weights, fusion_method= args.fusion_model, 
                        decoder_channels=args.decoder_channels, roi_size = (7,7), num_classes = args.num_classes, node_dim = args.node_dim, 
                        relation_dim = args.relation_dim, max_objects = args.max_objects, device="cuda")
     model.train()
