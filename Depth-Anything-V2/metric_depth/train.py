@@ -122,7 +122,7 @@ def main():
             start_epoch = checkpoint["epoch"]
             previous_best = checkpoint["previous_best"]
     total_iters = args.epochs * len(trainloader)
-    print(len(trainloader))
+    # print(len(trainloader))
     
     
     
@@ -243,6 +243,7 @@ def main():
                 'epoch': epoch,
                 'previous_best': previous_best,
             }
+            print(f"Saving epochs: {epoch}")
             torch.save(checkpoint, os.path.join(args.save_path, 'latest.pth'))
 
 
