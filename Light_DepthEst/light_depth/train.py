@@ -313,7 +313,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
             image = torch.autograd.Variable(sample_batched['image'].cuda(args.gpu, non_blocking=True))
             depth_gt = torch.autograd.Variable(sample_batched['depth'].cuda(args.gpu, non_blocking=True))
-            depth_est = model(image)
+            depth_est, init_depth, bboxes = model(image)
 
             if args.dataset == 'nyu':
                 mask = depth_gt > 0.1
