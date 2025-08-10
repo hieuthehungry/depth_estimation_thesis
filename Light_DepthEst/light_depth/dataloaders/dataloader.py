@@ -33,34 +33,13 @@ def collate_fn(batch):
         has_valid_depth = batch[0]["has_valid_depth"] 
     except:
         has_valid_depth = None
-    scene_graphs = [b['scene_graph'] for b in batch]  # list of dicts
 
-    # Example of stacking scene_graph tensors if shapes match
-    # if all(sg['obj_logits'].shape == batch[0]['scene_graph']['obj_logits'].shape for sg in scene_graphs):
-    if len(batch) > 1:
-        """
-            'pred_logits', 'pred_boxes', 'sub_logits', 'sub_boxes', 'obj_logits', 'obj_boxes', 'rel_logits'
-        """
-        batched_scene_graphs = {'pred_logits': None, 'pred_boxes': None, 
-                                'sub_logits': None, 'sub_boxes': None, 'obj_logits': None, 
-                                'obj_boxes': None, 'rel_logits': None}
-        from torch.nn.functional import pad
-        
-        def pad_to_max(tensor_list):
-            max_len = max([t.shape[0] for t in tensor_list])
-            padded = [pad(t, (0, 0, 0, max_len - t.shape[0])) for t in tensor_list]
-            return torch.stack(padded)
-        for key in batched_scene_graphs.keys():    
-            batched_scene_graphs[key] = pad_to_max([sg[key].squeeze() for sg in scene_graphs])
-            # batched_scene_graphs[key] = [sg[key].squeeze() for sg in scene_graphs]
-    else:
-        batched_scene_graphs = scene_graphs[0]
+
     # Otherwise keep as list for your model's custom handling
     
     return {
         "image": images,
         "depth": depth,
-        "scene_graph": batched_scene_graphs,
         "focal": torch.tensor([b['focal'] for b in batch]),
         "has_valid_depth": has_valid_depth
     }
@@ -184,7 +163,6 @@ class DataLoadPreprocess(Dataset):
             if self.args.dataset == 'kitti':
                 rgb_file = sample_path.split()[0]
                 depth_file = os.path.join(sample_path.split()[0].split('/')[0], sample_path.split()[1])
-                scene_graph_file = rgb_file.replace(".png", ".pt")
                 if self.args.use_right is True and random.random() > 0.5:
                     rgb_file.replace('image_02', 'image_03')
                     depth_file.replace('image_02', 'image_03')
@@ -194,10 +172,8 @@ class DataLoadPreprocess(Dataset):
 
             image_path = os.path.join(self.args.data_path, rgb_file)
             depth_path = os.path.join(self.args.gt_path, depth_file)
-            scene_graph_path = os.path.join(self.args.sg_path,scene_graph_file)
     
             image = Image.open(image_path)
-            scene_graph = torch.load(scene_graph_path)
             depth_gt = Image.open(depth_path)
             
             
@@ -253,19 +229,9 @@ class DataLoadPreprocess(Dataset):
                 W = self.args.input_width
                 b = 0
                 image, depth_gt, crop_box = self.random_crop(image, depth_gt, H, W)
-                sub_boxes, sub_keep = adjust_boxes(scene_graph['sub_boxes'][b], crop_box, (H, W))
-                obj_boxes, obj_keep = adjust_boxes(scene_graph['obj_boxes'][b], crop_box, (H, W))
 
-                # You must apply this mask consistently to rel_logits, sub_logits, obj_logits too:
-
-                scene_graph['sub_boxes'] =  scene_graph['sub_boxes'][b][sub_keep & obj_keep].unsqueeze(0)
-                scene_graph['obj_boxes'] =  scene_graph['obj_boxes'][b][sub_keep & obj_keep].unsqueeze(0)
-                scene_graph['rel_logits'] = scene_graph['rel_logits'][b][sub_keep & obj_keep].unsqueeze(0)
-                scene_graph['sub_logits'] = scene_graph['sub_logits'][b][sub_keep & obj_keep].unsqueeze(0)
-                scene_graph['obj_logits'] = scene_graph['obj_logits'][b][sub_keep & obj_keep].unsqueeze(0)
-
-            image, depth_gt = self.train_preprocess(image, depth_gt, scene_graph)
-            sample = {'image': image, "scene_graph":  scene_graph, 'depth': depth_gt, 'focal': focal}
+            image, depth_gt = self.train_preprocess(image, depth_gt)
+            sample = {'image': image, 'depth': depth_gt, 'focal': focal}
         
         else:
             if self.mode == 'online_eval':
@@ -274,10 +240,7 @@ class DataLoadPreprocess(Dataset):
                 data_path = self.args.data_path
 
             image_path = os.path.join(data_path, "./" + sample_path.split()[0])
-            scene_graph_file = sample_path.split()[0].replace(".png", ".pt")
-            scene_graph_path =  os.path.join(self.args.sg_path_eval,scene_graph_file)
             image = np.asarray(Image.open(image_path), dtype=np.float32) / 255.0
-            scene_graph = torch.load(scene_graph_path)
             
             if self.mode == 'online_eval':
                 gt_path = self.args.gt_path_eval
@@ -309,13 +272,12 @@ class DataLoadPreprocess(Dataset):
                 if self.mode == 'online_eval' and has_valid_depth:
                     depth_gt = depth_gt[top_margin:top_margin + 352, left_margin:left_margin + 1216, :]
             if self.mode == 'online_eval':
-                sample = {'image': image, "scene_graph": scene_graph, 'depth': depth_gt,  'focal': focal, 'has_valid_depth': has_valid_depth, 'path': image_path}
+                sample = {'image': image, 'depth': depth_gt,  'focal': focal, 'has_valid_depth': has_valid_depth, 'path': image_path}
             else:
-                sample = {'image': image,  "scene_graph": scene_graph, 'focal': focal}
+                sample = {'image': image, 'focal': focal}
         
         if self.transform:
             sample = self.transform(sample)
-            sample["scene_graph"] = scene_graph
             sample['path'] =  image_path
             if  self.mode == 'online_eval':
                 sample["has_valid_depth"] = has_valid_depth
@@ -351,16 +313,13 @@ class DataLoadPreprocess(Dataset):
         crop_box = (y, x, height, width)  # top, left, h, w
         return img_cropped, depth_cropped, crop_box
 
-    def train_preprocess(self, image, depth_gt, scene_graph=None):
+    def train_preprocess(self, image, depth_gt):
         # Random flipping
         do_flip = random.random()
         if do_flip > 0.5:
             image = (image[:, ::-1, :]).copy()
             depth_gt = (depth_gt[:, ::-1, :]).copy()
-            if scene_graph is not None:
-                for b in range(len(scene_graph['sub_boxes'])):
-                    scene_graph['sub_boxes'][b][:, 0] = 1.0 - scene_graph['sub_boxes'][b][:, 0]
-                    scene_graph['obj_boxes'][b][:, 0] = 1.0 - scene_graph['obj_boxes'][b][:, 0]
+        
         # Random gamma, brightness, color augmentation
         do_augment = random.random()
         if do_augment > 0.5:
